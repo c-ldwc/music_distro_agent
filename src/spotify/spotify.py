@@ -9,6 +9,7 @@ from werkzeug.serving import make_server  # For graceful server shutdown
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from datetime import datetime, timedelta
 from typing import Annotated, Any
+from src import classes
 
 # --- Configuration ---
 
@@ -98,12 +99,6 @@ class spotify_auth(BaseModel):
     scope: str
 
 
-class album(BaseModel):
-    artists: list[str]
-    title: str
-    id: str
-
-
 def length_check(s: str, l: int) -> str:
     if len(s) != l:
         raise ValueError(f"{s} is not a string of length {l}")
@@ -173,7 +168,7 @@ class spotify(BaseModel):
 
     def search(
         self, artist: str, album_name: str | None = None, market: str = "AU"
-    ) -> list[album] | list[dict[str, str]]:
+    ) -> list[classes.album] | list[dict[str, str]]:
         def search_type_val(s: str) -> str:
             search_types = ["album", "artist", "track"]
             if s not in search_types:
@@ -184,14 +179,14 @@ class spotify(BaseModel):
 
         def id_title(
             i: dict[str, Any], search_type: str
-        ) -> list[album] | list[dict[str, str]]:
+        ) -> list[classes.album] | list[dict[str, str]]:
             out = []
             for res in i[search_type + "s"]["items"]:
                 if search_type == "album":
                     artists = [a["name"] for a in res["artists"]]
                     title = res["name"]
                     id = res["id"]
-                    out.append(album(artists=artists, title=title, id=id))
+                    out.append(classes.album(artists=artists, title=title, id=id))
                 if search_type == "artist":
                     out.append({"artist": res["name"]})
             return out
