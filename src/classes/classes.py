@@ -1,12 +1,23 @@
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from spotify import album
 from pathlib import Path
 from typing import Any
 from langchain_anthropic import ChatAnthropic
+from datetime import datetime
 
 # T = TypeVar("T")
-from helpers import retry
+from ..helpers import retry
+
+
+class boom_email(BaseModel):
+    date: datetime
+    body: str
+
+
+class album(BaseModel):
+    artists: list[str]
+    title: str
+    id: str
 
 
 class extract_release(BaseModel):

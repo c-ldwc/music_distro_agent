@@ -13,3 +13,4 @@ wheels/
 *secret*
 .env
 boomkat_emails/
+playlists.db

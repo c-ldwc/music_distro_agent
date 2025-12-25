@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-from classes import track
+from src.classes import track
 import hashlib
 
 
@@ -23,7 +23,7 @@ def get_db_connection(db_path: str = "playlists.db") -> sqlite3.Connection:
     return conn
 
 
-def record_attempt(conn, release: track, playlist_name: str, playlist_id: str):
+def record_track(conn, release: track, playlist_name: str, playlist_id: str):
     cur = conn.cursor()
     cur.execute(
         "SELECT id, playlist_id, attempts FROM playlists WHERE id=? and playlist_id=?",
