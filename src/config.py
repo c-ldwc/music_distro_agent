@@ -60,7 +60,7 @@ class AnthropicConfig(BaseSettings):
     @classmethod
     def validate_not_placeholder(cls, v: str) -> str:
         """Ensure API key is not placeholder value."""
-        if not v or v.startswith("your_") or v.startswith("sk-ant-"):
+        if not v or v.startswith("your_") or v == "sk-ant-api03-...":
             raise ValueError(
                 "ANTHROPIC_API_KEY is not configured. " "Please set it in your .env file with a valid API key"
             )
