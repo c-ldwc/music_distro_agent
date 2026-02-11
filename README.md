@@ -208,15 +208,15 @@ All configuration is managed through environment variables in `.env`:
 
 ### Authentication Issues
 
-**Problem**: OAuth authentication fails  
-**Solution**: 
+**Problem**: OAuth authentication fails
+**Solution**:
 - Verify redirect URIs match in both Spotify/Google dashboards and your config
 - Delete `token.json` and re-authenticate
 - Check that credentials in `.env` are correct
 
 ### No Albums Found
 
-**Problem**: AI extraction finds artists but no Spotify matches  
+**Problem**: AI extraction finds artists but no Spotify matches
 **Solution**:
 - Check Spotify search manually to verify album exists
 - AI search tries up to 5 attempts with variations
@@ -225,7 +225,7 @@ All configuration is managed through environment variables in `.env`:
 
 ### Rate Limiting
 
-**Problem**: Spotify API returns 429 errors  
+**Problem**: Spotify API returns 429 errors
 **Solution**:
 - The application doesn't currently implement rate limiting
 - Wait a few minutes before retrying
@@ -233,7 +233,7 @@ All configuration is managed through environment variables in `.env`:
 
 ### Database Locked
 
-**Problem**: `database is locked` error  
+**Problem**: `database is locked` error
 **Solution**:
 - Ensure no other instance of the script is running
 - Check for zombie processes: `ps aux | grep python`
@@ -241,7 +241,7 @@ All configuration is managed through environment variables in `.env`:
 
 ### Gmail API Quota
 
-**Problem**: Gmail API quota exceeded  
+**Problem**: Gmail API quota exceeded
 **Solution**:
 - Default quota is 1 billion quota units/day
 - Each email list call uses ~5 units
@@ -312,7 +312,7 @@ pytest -v
 
 All code is automatically checked with:
 - **Ruff** - Linting and formatting
-- **MyPy** - Type checking  
+- **MyPy** - Type checking
 - **Bandit** - Security scanning
 - **Pytest** - Automated testing
 

@@ -21,9 +21,7 @@ class TestDatabaseConnection:
 
         # Verify schema
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='playlists'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='playlists'")
         result = cursor.fetchone()
         assert result is not None
         assert result[0] == "playlists"
@@ -61,9 +59,7 @@ class TestRecordTrack:
         """Test inserting a new track."""
         conn, db_path = temp_database
 
-        test_track = track(
-            artist="Test Artist", album="Test Album", track_id="spotify:track:test123"
-        )
+        test_track = track(artist="Test Artist", album="Test Album", track_id="spotify:track:test123")
 
         record_track(
             conn,
@@ -89,9 +85,7 @@ class TestRecordTrack:
         """Test that duplicate inserts increment attempts."""
         conn, db_path = temp_database
 
-        test_track = track(
-            artist="Test Artist", album="Test Album", track_id="spotify:track:test456"
-        )
+        test_track = track(artist="Test Artist", album="Test Album", track_id="spotify:track:test456")
 
         # Insert first time
         record_track(
@@ -111,9 +105,7 @@ class TestRecordTrack:
 
         # Verify attempts incremented
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT attempts FROM playlists WHERE id=?", (test_track.track_id,)
-        )
+        cursor.execute("SELECT attempts FROM playlists WHERE id=?", (test_track.track_id,))
         result = cursor.fetchone()
 
         assert result[0] == 1  # Should be 1 after one duplicate attempt
@@ -122,24 +114,16 @@ class TestRecordTrack:
         """Test that row_id is a hash of track_id and playlist_id."""
         conn, db_path = temp_database
 
-        test_track = track(
-            artist="Test Artist", album="Test Album", track_id="spotify:track:hash_test"
-        )
+        test_track = track(artist="Test Artist", album="Test Album", track_id="spotify:track:hash_test")
         playlist_id = "test_playlist_id"
 
         # Calculate expected hash
-        expected_hash = hashlib.sha256(
-            (test_track.track_id + playlist_id).encode()
-        ).hexdigest()
+        expected_hash = hashlib.sha256((test_track.track_id + playlist_id).encode()).hexdigest()
 
-        record_track(
-            conn, test_track, playlist_name="Test Playlist", playlist_id=playlist_id
-        )
+        record_track(conn, test_track, playlist_name="Test Playlist", playlist_id=playlist_id)
 
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT row_id FROM playlists WHERE id=?", (test_track.track_id,)
-        )
+        cursor.execute("SELECT row_id FROM playlists WHERE id=?", (test_track.track_id,))
         result = cursor.fetchone()
 
         assert result[0] == expected_hash
@@ -155,20 +139,14 @@ class TestRecordTrack:
         )
 
         # Add to first playlist
-        record_track(
-            conn, test_track, playlist_name="Playlist 1", playlist_id="playlist_1"
-        )
+        record_track(conn, test_track, playlist_name="Playlist 1", playlist_id="playlist_1")
 
         # Add to second playlist
-        record_track(
-            conn, test_track, playlist_name="Playlist 2", playlist_id="playlist_2"
-        )
+        record_track(conn, test_track, playlist_name="Playlist 2", playlist_id="playlist_2")
 
         # Verify both records exist
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT COUNT(*) FROM playlists WHERE id=?", (test_track.track_id,)
-        )
+        cursor.execute("SELECT COUNT(*) FROM playlists WHERE id=?", (test_track.track_id,))
         count = cursor.fetchone()[0]
 
         assert count == 2

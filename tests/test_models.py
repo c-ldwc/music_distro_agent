@@ -105,9 +105,7 @@ class TestTrack:
 
     def test_valid_track(self):
         """Test creating valid track object."""
-        test_track = track(
-            artist="Test Artist", album="Test Album", track_id="spotify:track:abc123"
-        )
+        test_track = track(artist="Test Artist", album="Test Album", track_id="spotify:track:abc123")
         assert test_track.artist == "Test Artist"
         assert test_track.album == "Test Album"
         assert test_track.track_id == "spotify:track:abc123"

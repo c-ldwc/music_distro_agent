@@ -21,9 +21,7 @@ class SpotifyConfig(BaseSettings):
         default="playlist-modify-public,playlist-modify-private,playlist-read-private",
         description="Comma-separated list of Spotify API scopes",
     )
-    redirect_uri: str = Field(
-        default="http://localhost:8888/callback", description="OAuth redirect URI"
-    )
+    redirect_uri: str = Field(default="http://localhost:8888/callback", description="OAuth redirect URI")
 
     model_config = SettingsConfigDict(
         env_prefix="SPOTIFY_",
@@ -48,12 +46,8 @@ class AnthropicConfig(BaseSettings):
     """Anthropic/Claude AI API configuration settings."""
 
     api_key: str = Field(..., description="Anthropic API key for Claude")
-    model_name: str = Field(
-        default="claude-haiku-4-5-20251001", description="Claude model to use"
-    )
-    max_retries: int = Field(
-        default=3, description="Maximum number of retries for API calls"
-    )
+    model_name: str = Field(default="claude-haiku-4-5-20251001", description="Claude model to use")
+    max_retries: int = Field(default=3, description="Maximum number of retries for API calls")
 
     model_config = SettingsConfigDict(
         env_prefix="ANTHROPIC_",
@@ -68,8 +62,7 @@ class AnthropicConfig(BaseSettings):
         """Ensure API key is not placeholder value."""
         if not v or v.startswith("your_") or v.startswith("sk-ant-"):
             raise ValueError(
-                "ANTHROPIC_API_KEY is not configured. "
-                "Please set it in your .env file with a valid API key"
+                "ANTHROPIC_API_KEY is not configured. " "Please set it in your .env file with a valid API key"
             )
         return v
 
@@ -77,20 +70,14 @@ class AnthropicConfig(BaseSettings):
 class GmailConfig(BaseSettings):
     """Gmail API configuration settings."""
 
-    secret_path: Path = Field(
-        ..., description="Path to Google OAuth client secret JSON file"
-    )
+    secret_path: Path = Field(..., description="Path to Google OAuth client secret JSON file")
     scopes: str = Field(
         default="https://www.googleapis.com/auth/gmail.readonly",
         description="Gmail API scopes",
     )
-    token_path: Path = Field(
-        default=Path("token.json"), description="Path to store OAuth tokens"
-    )
+    token_path: Path = Field(default=Path("token.json"), description="Path to store OAuth tokens")
 
-    model_config = SettingsConfigDict(
-        env_prefix="GMAIL_", env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_prefix="GMAIL_", env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @field_validator("secret_path")
     @classmethod
@@ -108,9 +95,7 @@ class GmailConfig(BaseSettings):
 class DatabaseConfig(BaseSettings):
     """Database configuration settings."""
 
-    path: Path = Field(
-        default=Path("playlists.db"), description="Path to SQLite database file"
-    )
+    path: Path = Field(default=Path("playlists.db"), description="Path to SQLite database file")
 
     model_config = SettingsConfigDict(
         env_prefix="DATABASE_",
@@ -127,13 +112,9 @@ class EmailConfig(BaseSettings):
         default=Path("boomkat_emails"),
         description="Directory for storing downloaded emails",
     )
-    max_emails_per_run: int = Field(
-        default=10, description="Maximum number of emails to process in one run"
-    )
+    max_emails_per_run: int = Field(default=10, description="Maximum number of emails to process in one run")
 
-    model_config = SettingsConfigDict(
-        env_prefix="EMAIL_", env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_prefix="EMAIL_", env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @field_validator("path")
     @classmethod

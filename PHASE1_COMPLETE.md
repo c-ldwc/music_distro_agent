@@ -1,6 +1,6 @@
 # Phase 1 Completion Summary
 
-**Date**: February 5, 2026  
+**Date**: February 5, 2026
 **Status**: ✅ COMPLETED
 
 ## Tasks Completed
@@ -110,7 +110,7 @@ The README now includes:
 # Before
 print(f"error: {err}")
 
-# After  
+# After
 logger.error(f"Failed to decode JSON response: {err}")
 logger.debug(f"Response content: {response.content[:200]}...")
 ```
