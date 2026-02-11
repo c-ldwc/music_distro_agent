@@ -1,6 +1,7 @@
+from collections.abc import Callable
 from random import random
-from typing import Any, Callable
 from time import sleep
+from typing import Any
 
 
 def retry[T](
@@ -17,7 +18,7 @@ def retry[T](
         The output of the method, or None if all retries failed
     """
     tries = 0
-    while tries < 3:
+    while tries < retries:
         try:
             return method(**args)
         except Exception as err:

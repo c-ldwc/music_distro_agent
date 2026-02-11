@@ -1,14 +1,16 @@
-import httpx
-import flask
-import webbrowser
-import threading
 import queue  # Import the thread-safe queue module
+import threading
+import webbrowser
 from base64 import b64encode
-from pydantic import AfterValidator, BaseModel
-from werkzeug.serving import make_server  # For graceful server shutdown
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from datetime import datetime, timedelta
 from typing import Annotated, Any
+
+import flask
+import httpx
+from pydantic import AfterValidator, BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from werkzeug.serving import make_server  # For graceful server shutdown
+
 from src import classes
 
 # --- Configuration ---

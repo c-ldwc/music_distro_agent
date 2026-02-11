@@ -1,6 +1,3 @@
-from . import spotify
-from . import agent
-from . import classes
-from . import db
+from . import agent, classes, db, spotify
 
 __all__ = ["spotify", "agent", "classes", "db"]
