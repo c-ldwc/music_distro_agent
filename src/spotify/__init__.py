@@ -1,3 +1,3 @@
-from .spotify import spotify, auth_params, album
+from .spotify import auth_params, spotify
 
-__all__ = ["spotify", "auth_params", "album"]
+__all__ = ["spotify", "auth_params"]

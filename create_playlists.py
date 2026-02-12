@@ -1,7 +1,9 @@
-from spotify import spotify, auth_params
-from classes import env_settings
-from playlist_db import get_db_connection
+import argparse
 from sqlite3 import Connection
+
+from src.config import load_config
+from src.db import get_db_connection
+from src.spotify import auth_params, spotify
 
 
 def get_playlist_ids(conn: Connection) -> list[str]:
@@ -23,14 +25,19 @@ def get_playlist_tracks(conn: Connection, playlist_id: str):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--id", type="str", help="playlist id")
+
+    args = parser.parse_args()
+
     conn = get_db_connection("playlists.db")
     playlist_ids = get_playlist_ids(conn)
     print(playlist_ids)
-    settings = env_settings()
+    config = load_config()
     a = auth_params(
-        client_id=settings.SPOTIFY_CLIENT_ID,
-        client_secret=settings.SPOTIFY_CLIENT_SECRET,
-        scope=settings.SPOTIFY_SCOPES,
+        client_id=config.spotify.client_id,
+        client_secret=config.spotify.client_secret,
+        scope=config.spotify.scopes,
         state="state",
     )
 

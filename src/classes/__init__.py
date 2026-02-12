@@ -1,11 +1,10 @@
 from .classes import (
     Agent,
+    album,
     boom_email,
+    extract_release,
     playlist,
     track,
-    env_settings,
-    album,
-    extract_release,
 )
 
 __all__ = [
@@ -13,7 +12,6 @@ __all__ = [
     "boom_email",
     "playlist",
     "track",
-    "env_settings",
     "album",
     "extract_release",
 ]

@@ -9,8 +9,24 @@ wheels/
 # Virtual environments
 .venv
 
-#misc
-*secret*
+# Credentials and secrets (CRITICAL - DO NOT COMMIT)
+client_secret*.json
+*secret*.json
+token.json
 .env
+*.key
+*.pem
+
+# Data directories
 boomkat_emails/
+test_email/
+old/
+
+# Database files
 playlists.db
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/

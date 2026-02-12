@@ -1,11 +1,10 @@
+from collections.abc import Callable
 from random import random
-from typing import Any, Callable
 from time import sleep
+from typing import Any
 
 
-def retry[T](
-    method: Callable[[], T], args: dict[str, Any], retries: int = 3
-) -> T | None:
+def retry[T](method: Callable[[], T], args: dict[str, Any], retries: int = 3) -> T | None:
     """Retries the method function retries many times with a random wait on [.5, 1.5)
 
     Args:
@@ -17,7 +16,7 @@ def retry[T](
         The output of the method, or None if all retries failed
     """
     tries = 0
-    while tries < 3:
+    while tries < retries:
         try:
             return method(**args)
         except Exception as err:

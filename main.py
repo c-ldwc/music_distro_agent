@@ -1,94 +1,114 @@
-from src.agent import ExtractionAgent, SearchAgent
-from src.spotify import spotify, album, auth_params
-from src.db import record_track, get_db_connection
-from langchain.tools import tool
-import json
-from src import classes
+"""
+Spotify Playlist Automation - Main Entry Point
+
+Processes music distributor emails to automatically create Spotify playlists.
+Extracts releases using AI, searches Spotify for matches, and maintains a database.
+"""
+
+import sys
+
 from httpx import HTTPStatusError
+from langchain.tools import tool
+
+from src.agent import ExtractionAgent, SearchAgent
+from src.config import load_config
+from src.db import get_db_connection
+from src.logging_config import get_logger, setup_logging
+from src.services import EmailProcessor, SpotifyService
 
 
-settings = classes.env_settings()
-a = auth_params(
-    client_id=settings.SPOTIFY_CLIENT_ID,
-    client_secret=settings.SPOTIFY_CLIENT_SECRET,
-    scope=settings.SPOTIFY_SCOPES,
-    state="state",
-)
+def main():
+    """Main entry point for playlist automation."""
+    # Setup logging
+    logger = setup_logging(log_level="INFO")
+    module_logger = get_logger(__name__)
 
-spot_client = spotify(auth_params=a)
-spot_client.get_auth_code_and_tokens()
+    module_logger.info("Starting Spotify playlist automation...")
 
-
-@tool
-def search(artist: str, album: str):
-    """
-    Args:
-        artist: str. The name of the artist to search for
-        album:str. The name of the album to search for
-    returns:
-        list[json string] where the json strings are the search results from the api.
-        The strings have the following fields
-            artist: the result's artist. There may be multiple,
-            title: the title of the release
-            id: you can ignore this for decision making.
-
-    """
-    print(f"searching for artist {artist} and album {album}")
+    # Load configuration
     try:
-        results = spot_client.search(artist, album)
-        return [json.dumps(i) for i in results]
-    except Exception as err:
-        print(f"there was an error in search: {err}")
+        config = load_config()
+    except Exception as e:
+        logger.error(f"Failed to load configuration: {e}")
+        logger.error("Please ensure .env file is configured correctly")
+        sys.exit(1)
+
+    # Initialize and authenticate Spotify
+    module_logger.info("Initializing Spotify client...")
+    spotify_service = SpotifyService(config.spotify)
+
+    try:
+        spotify_service.authenticate()
+        module_logger.info("✓ Spotify authentication successful")
+    except Exception as e:
+        module_logger.error(f"Spotify authentication failed: {e}")
+        sys.exit(1)
+
+    # Define search tool for agents
+    @tool
+    def search(artist: str, album: str):
+        """
+        Search Spotify for an album by artist.
+
+        Args:
+            artist: The name of the artist to search for
+            album: The name of the album to search for
+
+        Returns:
+            List of JSON strings with search results containing artist, title, and id fields
+        """
+        module_logger.debug(f"Searching for artist: {artist}, album: {album}")
+        try:
+            results = spotify_service.client.search(artist, album)
+            return [i.model_dump_json() for i in results]
+        except HTTPStatusError as err:
+            module_logger.error(f"Spotify API error during search: {err.response.status_code} - {err}")
+            return []
+        except Exception as err:
+            module_logger.error(f"Unexpected error in search: {err}", exc_info=True)
+            return []
+
+    # Initialize AI agents
+    module_logger.info("Initializing AI agents...")
+    agents = {
+        'extract': ExtractionAgent(
+            api_key=config.anthropic.api_key,
+            temperature=0.0
+        ),
+        'search': SearchAgent(
+            api_key=config.anthropic.api_key,
+            temperature=0.0
+        )
+    }
+
+    # Connect to database
+    module_logger.info("Connecting to database...")
+    try:
+        db_conn = get_db_connection()
+        module_logger.info("✓ Database connection established")
+    except Exception as e:
+        module_logger.error(f"Failed to connect to database: {e}")
+        sys.exit(1)
+
+    # Process emails
+    processor = EmailProcessor(config, spotify_service, agents, db_conn, module_logger)
+    stats = processor.process_all_emails(search_tool=search, limit=10)
+
+    # Print summary
+    module_logger.info("=" * 60)
+    module_logger.info("Processing complete!")
+    module_logger.info(f"Total emails processed: {stats['processed']}")
+    module_logger.info(f"Successful: {stats['success']}")
+    module_logger.info(f"Errors: {stats['errors']}")
+    module_logger.info(f"Total albums found: {stats['total_albums_found']}")
+    module_logger.info(f"Total albums not found: {stats['total_albums_not_found']}")
+    module_logger.info("=" * 60)
+
+    # Cleanup
+    if db_conn:
+        db_conn.close()
+        module_logger.debug("Database connection closed")
 
 
-j = 0
-extract_agent = ExtractionAgent(
-    api_key=settings.ANTHROPIC_API_KEY,
-)
-
-search_agent = SearchAgent(
-    api_key=settings.ANTHROPIC_API_KEY,
-)
-
-db_conn = get_db_connection()
-
-for dirpath, _, files in settings.email_path.walk():
-    for boomkat_file in [i for i in files if ".txt" in i]:
-        with open(dirpath / boomkat_file, "r") as f:
-            email = classes.boom_email(**json.load(f))
-        extraction_results = extract_agent.run(email=email)
-        if extraction_results is None:
-            continue
-
-        playlist_name = f"Boomkat {email.date.strftime('%Y-%m-%d')}"
-        spot_playlist = spot_client.get_playlist_by_name(playlist_name)
-        if spot_playlist is None:
-            spot_playlist = spot_client.create_playlist(name=playlist_name)
-        found_albums: list[album] = []
-        for r in extraction_results:
-            result = search_agent.run(release=r, tools=[search])
-            if result is not None:
-                found_albums.append(result)
-                try:
-                    tracks = spot_client.get_album_tracks(result.id)
-
-                    for t in tracks:
-                        record_track(
-                            db_conn,
-                            classes.track(
-                                artist=",".join(result.artists),
-                                album=result.title,
-                                track_id=t,
-                            ),
-                            playlist_name=playlist_name,
-                            playlist_id=spot_playlist["id"],
-                        )
-                except HTTPStatusError as err:
-                    print(
-                        f"retrieving tracks for {result.title} by {','.join(result.artists)} failed with error {err}"
-                    )
-
-        # spot_client.add_to_playlist(tracks=tracks, playlist_id=spot_playlist["id"])
-        j += 1
-        if j == 10:
-            break
+if __name__ == "__main__":
+    main()
