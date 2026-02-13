@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Wrapper script for the Spotify Playlist Automation CLI
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_PYTHON="$SCRIPT_DIR/.venv/bin/python"
+
+# Check if virtual environment exists
+if [ ! -f "$VENV_PYTHON" ]; then
+    echo "Error: Virtual environment not found at $SCRIPT_DIR/.venv"
+    echo "Please run 'uv sync' first to install dependencies."
+    exit 1
+fi
+
+# Run the CLI with all arguments
+exec "$VENV_PYTHON" -m src.cli "$@"

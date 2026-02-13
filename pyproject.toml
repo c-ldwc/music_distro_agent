@@ -5,6 +5,7 @@ description = "Automated Spotify playlist creation from Boomkat emails using AI"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+  "click>=8.1.0",
   "dotenv>=0.9.9",
   "flask>=3.1.2",
   "google-api-python-client>=2.187.0",
@@ -17,7 +18,11 @@ dependencies = [
   "pydantic-settings>=2.12.0",
   "alembic>=1.13.0",
   "pytest>=9.0.2",
+  "tqdm>=4.66.0",
 ]
+
+[project.scripts]
+spotify-cli = "src.cli:cli"
 
 [project.optional-dependencies]
 dev = [
@@ -66,7 +71,7 @@ no_strict_optional = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra -q --strict-markers --cov=src --cov-report=term-missing"
+addopts = "-ra -q --strict-markers "
 testpaths = ["tests"]
 pythonpath = ["."]
 
@@ -89,3 +94,6 @@ exclude_lines = [
 [tool.bandit]
 exclude_dirs = ["tests", ".venv"]
 skips = ["B101"]  # assert_used
+
+[tool.uv]
+package = true
