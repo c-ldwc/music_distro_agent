@@ -29,8 +29,9 @@ class TestSpotifyConfig:
         assert config.client_secret == "test_client_secret"
         assert "playlist-modify" in config.scopes
 
-    def test_missing_client_id(self, monkeypatch):
+    def test_missing_client_id(self, temp_dir, monkeypatch):
         """Test error when client_id is missing."""
+        monkeypatch.chdir(temp_dir)  # Isolate from project .env file
         monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "test_secret")
         monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
 
@@ -60,8 +61,9 @@ class TestAnthropicConfig:
         assert config.model_name == "claude-haiku-4-5-20251001"
         assert config.max_retries == 3
 
-    def test_missing_api_key(self, monkeypatch):
+    def test_missing_api_key(self, temp_dir, monkeypatch):
         """Test error when API key is missing."""
+        monkeypatch.chdir(temp_dir)  # Isolate from project .env file
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -138,16 +140,18 @@ class TestAppConfig:
         assert config.database is not None
         assert config.email is not None
 
-    def test_invalid_config_collects_errors(self, monkeypatch):
+    def test_invalid_config_collects_errors(self, temp_dir, monkeypatch):
         """Test that invalid config collects all errors."""
+        monkeypatch.chdir(temp_dir)  # Isolate from project .env file
         monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
         with pytest.raises(ConfigurationError):
             AppConfig(validate=True)
 
-    def test_no_validation_on_request(self, monkeypatch):
+    def test_no_validation_on_request(self, temp_dir, monkeypatch):
         """Test that validation can be skipped."""
+        monkeypatch.chdir(temp_dir)  # Isolate from project .env file
         monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
 
         config = AppConfig(validate=False)
@@ -173,8 +177,9 @@ class TestLoadConfig:
         config = load_config()
         assert config.is_valid()
 
-    def test_load_invalid_config_raises(self, monkeypatch):
+    def test_load_invalid_config_raises(self, temp_dir, monkeypatch):
         """Test that invalid config raises error."""
+        monkeypatch.chdir(temp_dir)  # Isolate from project .env file
         monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
 
         with pytest.raises(ConfigurationError):
