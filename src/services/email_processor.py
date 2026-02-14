@@ -27,8 +27,8 @@ class EmailProcessor:
         """
         self.config = config
         self.spotify = spotify_service.client
-        self.extract_agent = agents['extract']
-        self.search_agent = agents['search']
+        self.extract_agent = agents["extract"]
+        self.search_agent = agents["search"]
         self.db = db_conn
         self.logger = logger
 
@@ -43,12 +43,7 @@ class EmailProcessor:
         Returns:
             Dict with processing stats (albums_found, albums_not_found, etc.)
         """
-        stats = {
-            'albums_found': 0,
-            'albums_not_found': 0,
-            'albums_from_cache': 0,
-            'success': False
-        }
+        stats = {"albums_found": 0, "albums_not_found": 0, "albums_from_cache": 0, "success": False}
 
         filename = file_path.name
         self.logger.info(f"Processing email: {filename}")
@@ -122,7 +117,7 @@ class EmailProcessor:
                     title=mapping["spotify_album"],
                     id=mapping["spotify_album_id"],
                 )
-                stats['albums_from_cache'] += 1
+                stats["albums_from_cache"] += 1
             elif mapping and not is_valid_spotify_id(mapping["spotify_album_id"]):
                 # Invalid cached ID
                 self.logger.warning(
@@ -156,18 +151,18 @@ class EmailProcessor:
                         result = None
                 except Exception as e:
                     self.logger.error(f"Search agent failed for {r.album} by {r.artist}: {e}", exc_info=True)
-                    stats['albums_not_found'] += 1
+                    stats["albums_not_found"] += 1
                     continue
 
             if result is not None:
                 # Validate ID before using
                 if not is_valid_spotify_id(result.id):
                     self.logger.error(f"Skipping album with invalid ID: {result.title} (ID: '{result.id}')")
-                    stats['albums_not_found'] += 1
+                    stats["albums_not_found"] += 1
                     continue
 
                 found_albums.append(result)
-                stats['albums_found'] += 1
+                stats["albums_found"] += 1
 
                 # Get tracks and record
                 try:
@@ -199,14 +194,14 @@ class EmailProcessor:
                         exc_info=True,
                     )
             else:
-                stats['albums_not_found'] += 1
+                stats["albums_not_found"] += 1
                 self.logger.debug(f"✗ Not found: {r.album} by {r.artist}")
 
         self.logger.info(
             f"Processed {filename}: {stats['albums_found']} albums found "
             f"({stats['albums_from_cache']} from cache), {stats['albums_not_found']} not found"
         )
-        stats['success'] = True
+        stats["success"] = True
         return stats
 
     def process_all_emails(self, search_tool, limit=10):
@@ -220,13 +215,7 @@ class EmailProcessor:
         Returns:
             Dict with summary stats
         """
-        summary = {
-            'processed': 0,
-            'success': 0,
-            'errors': 0,
-            'total_albums_found': 0,
-            'total_albums_not_found': 0
-        }
+        summary = {"processed": 0, "success": 0, "errors": 0, "total_albums_found": 0, "total_albums_not_found": 0}
 
         self.logger.info(f"Scanning for emails in {self.config.email.path}")
 
@@ -235,20 +224,20 @@ class EmailProcessor:
             self.logger.info(f"Found {len(email_files)} email files to process")
 
             for email_file in email_files:
-                if summary['processed'] >= limit:
+                if summary["processed"] >= limit:
                     self.logger.info(f"Reached processing limit of {limit} emails")
                     break
 
-                summary['processed'] += 1
+                summary["processed"] += 1
                 file_path = dirpath / email_file
 
                 stats = self.process_email_file(file_path, search_tool)
 
-                if stats['success']:
-                    summary['success'] += 1
-                    summary['total_albums_found'] += stats['albums_found']
-                    summary['total_albums_not_found'] += stats['albums_not_found']
+                if stats["success"]:
+                    summary["success"] += 1
+                    summary["total_albums_found"] += stats["albums_found"]
+                    summary["total_albums_not_found"] += stats["albums_not_found"]
                 else:
-                    summary['errors'] += 1
+                    summary["errors"] += 1
 
         return summary

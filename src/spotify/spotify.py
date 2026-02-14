@@ -91,9 +91,9 @@ class spotify_auth(BaseModel):
     scope: str
 
 
-def length_check(s: str, l: int) -> str:
-    if len(s) != l:
-        raise ValueError(f"{s} is not a string of length {l}")
+def length_check(s: str, length: int) -> str:
+    if len(s) != length:
+        raise ValueError(f"{s} is not a string of length {length}")
     return s
 
 
@@ -215,9 +215,7 @@ class spotify(BaseModel):
         return result
 
     def playlist_exist(self, id: str) -> bool:
-        if "error" in self._construct_call(f"playlists/{id}"):
-            return False
-        return True
+        return "error" not in self._construct_call(f"playlists/{id}")
 
     def get_playlist_by_name(self, name: str):
         call = self._construct_call(f"users/{self.user_id}/playlists", params={"limit": 50})
@@ -235,7 +233,7 @@ class spotify(BaseModel):
         return None
 
     def create_playlist(self, name: str, public: bool = True, collaborative: bool = False):
-        body = {"name": name, "public": True, "collaborative": False, "description": ""}
+        body = {"name": name, "public": public, "collaborative": collaborative, "description": ""}
 
         result = self._construct_call(endpoint=f"users/{self.user_id}/playlists", method="POST", data=body)
         return {i: result[i] for i in result if i in ["id", "href"]}

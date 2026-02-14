@@ -49,9 +49,9 @@ class Agent[T](BaseModel):
     prompt: str
     response_format: dict[str, Any] | None = None
     temperature: float = 0.0  # Deterministic by default
-    max_tokens: int = 4096    # Control output length
+    max_tokens: int = 4096  # Control output length
 
-    def model_post_init(self, context: Any, /) -> None:
+    def model_post_init(self, context: Any, /) -> None:  # noqa: ARG002
         self.model = ChatAnthropic(
             model_name=self.model_name,
             api_key=self.api_key,

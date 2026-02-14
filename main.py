@@ -71,14 +71,8 @@ def main():
     # Initialize AI agents
     module_logger.info("Initializing AI agents...")
     agents = {
-        'extract': ExtractionAgent(
-            api_key=config.anthropic.api_key,
-            temperature=0.0
-        ),
-        'search': SearchAgent(
-            api_key=config.anthropic.api_key,
-            temperature=0.0
-        )
+        "extract": ExtractionAgent(api_key=config.anthropic.api_key, temperature=0.0),
+        "search": SearchAgent(api_key=config.anthropic.api_key, temperature=0.0),
     }
 
     # Connect to database

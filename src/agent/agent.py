@@ -114,22 +114,11 @@ search_format = {
             "title": "SearchResult",
             "type": "object",
             "properties": {
-                "album": {
-                    "anyOf": [
-                        classes.album.model_json_schema(),
-                        {"type": "null"}
-                    ]
-                },
-                "confidence": {
-                    "type": "string",
-                    "enum": ["EXACT", "HIGH", "MEDIUM", "LOW", "NONE"]
-                },
-                "reasoning": {
-                    "type": "string",
-                    "description": "Brief explanation of confidence level"
-                }
+                "album": {"anyOf": [classes.album.model_json_schema(), {"type": "null"}]},
+                "confidence": {"type": "string", "enum": ["EXACT", "HIGH", "MEDIUM", "LOW", "NONE"]},
+                "reasoning": {"type": "string", "description": "Brief explanation of confidence level"},
             },
-            "required": ["album", "confidence", "reasoning"]
+            "required": ["album", "confidence", "reasoning"],
         }
     },
 }
@@ -238,7 +227,7 @@ class SearchAgent(classes.Agent[classes.album]):
             logger.info(f"⚠ Returning MEDIUM confidence match: {fallback.title}")
             return fallback
 
-        logger.info(f"✗ No confident match found")
+        logger.info("✗ No confident match found")
         return None
 
     def _get_search_strategies(self, release: classes.extract_release) -> list[tuple[str, str]]:
@@ -276,7 +265,9 @@ class SearchAgent(classes.Agent[classes.album]):
 
         return strategies
 
-    def _attempt_search(self, artist: str, album: str, tools: list[Callable[[Any], Any]]) -> tuple[classes.album | None, str]:
+    def _attempt_search(
+        self, artist: str, album: str, tools: list[Callable[[Any], Any]]
+    ) -> tuple[classes.album | None, str]:
         """Make a single search attempt, return (album, confidence)."""
         agent = create_agent(self.model, tools=tools)
 

@@ -36,8 +36,7 @@ class SpotifyConfig(BaseSettings):
         """Ensure credentials are not placeholder values."""
         if not v or v.startswith("your_") or v == "":
             raise ValueError(
-                f"{info.field_name} is not configured. "
-                f"Please set SPOTIFY_{info.field_name.upper()} in your .env file"
+                f"{info.field_name} is not configured. Please set SPOTIFY_{info.field_name.upper()} in your .env file"
             )
         return v
 
@@ -62,7 +61,7 @@ class AnthropicConfig(BaseSettings):
         """Ensure API key is not placeholder value."""
         if not v or v.startswith("your_") or v == "sk-ant-api03-...":
             raise ValueError(
-                "ANTHROPIC_API_KEY is not configured. " "Please set it in your .env file with a valid API key"
+                "ANTHROPIC_API_KEY is not configured. Please set it in your .env file with a valid API key"
             )
         return v
 
@@ -74,6 +73,7 @@ class GmailConfig(BaseSettings):
     scopes: str = Field(
         default="https://www.googleapis.com/auth/gmail.readonly",
         description="Gmail API scopes",
+        env_parse=lambda x: x.split(","),
     )
     token_path: Path = Field(default=Path("token.json"), description="Path to store OAuth tokens")
 
