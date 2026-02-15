@@ -4,9 +4,7 @@ from time import sleep
 from typing import Any
 
 
-def retry[T](
-    method: Callable[[], T], args: dict[str, Any], retries: int = 3
-) -> T | None:
+def retry[T](method: Callable[[], T], args: dict[str, Any], retries: int = 3) -> T | None:
     """Retries the method function retries many times with a random wait on [.5, 1.5)
 
     Args:

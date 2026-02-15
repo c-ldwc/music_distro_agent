@@ -1,7 +1,7 @@
 import argparse
 from sqlite3 import Connection
 
-from src.classes import env_settings
+from src.config import load_config
 from src.db import get_db_connection
 from src.spotify import auth_params, spotify
 
@@ -33,11 +33,11 @@ if __name__ == "__main__":
     conn = get_db_connection("playlists.db")
     playlist_ids = get_playlist_ids(conn)
     print(playlist_ids)
-    settings = env_settings()
+    config = load_config()
     a = auth_params(
-        client_id=settings.SPOTIFY_CLIENT_ID,
-        client_secret=settings.SPOTIFY_CLIENT_SECRET,
-        scope=settings.SPOTIFY_SCOPES,
+        client_id=config.spotify.client_id,
+        client_secret=config.spotify.client_secret,
+        scope=config.spotify.scopes,
         state="state",
     )
 

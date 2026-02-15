@@ -5,6 +5,7 @@ from datetime import datetime
 from src.classes import track
 from src.utils import is_valid_spotify_id
 
+
 def get_db_connection(db_path: str = "playlists.db") -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.execute(
@@ -38,7 +39,7 @@ def get_db_connection(db_path: str = "playlists.db") -> sqlite3.Connection:
     return conn
 
 
-def drop_playlist(conn, playlist_name:str | None, playlist_id: str | None):
+def drop_playlist(conn, playlist_name: str | None, playlist_id: str | None):
     if not (playlist_id or playlist_name):
         raise RuntimeError("Please provide a playlist_name or playlist_id")
     cur = conn.cursor()
@@ -46,12 +47,16 @@ def drop_playlist(conn, playlist_name:str | None, playlist_id: str | None):
         cur.execute("Select distinct playlist_name from playlists where playlist_id=?", (playlist_id))
         row = cur.fetchone()
         if row[0] != playlist_name:
-            raise RuntimeError(f"The playliist with id {playlist_id} has name {row[0]} which is not the playlist_name provided ({playlist_name})")
+            raise RuntimeError(
+                f"The playliist with id {playlist_id} has name {row[0]} which is not the playlist_name provided ({playlist_name})"
+            )
     if playlist_id:
         cur.execute("Delete from playlists where playlist_id=?", playlist_id)
 
     if playlist_name:
         cur.execute("Delete from playlists where playlist_name=?", playlist_name)
+
+
 def record_track(conn, release: track, playlist_name: str, playlist_id: str):
     cur = conn.cursor()
     cur.execute(
@@ -68,9 +73,7 @@ def record_track(conn, release: track, playlist_name: str, playlist_id: str):
         cur.execute(
             "INSERT INTO playlists (row_id, artist, album, id, playlist_id, playlist_name) VALUES (?, ?, ?, ?, ?, ?)",
             (
-                hashlib.sha256(
-                    release.track_id.encode() + playlist_id.encode()
-                ).hexdigest(),
+                hashlib.sha256(release.track_id.encode() + playlist_id.encode()).hexdigest(),
                 release.artist,
                 release.album,
                 release.track_id,
@@ -84,20 +87,20 @@ def record_track(conn, release: track, playlist_name: str, playlist_id: str):
 def get_album_mapping(conn, extracted_artist: str, extracted_album: str, playlist_id: str) -> dict | None:
     """
     Get the Spotify album mapping for a previously searched album.
-    
+
     Args:
         conn: Database connection
         extracted_artist: Artist name as extracted from email (comma-separated)
         extracted_album: Album name as extracted from email
         playlist_id: Spotify playlist ID
-        
+
     Returns:
         Dict with spotify_artist, spotify_album, and spotify_album_id if found, None otherwise
     """
     cur = conn.cursor()
     cur.execute(
-        """SELECT spotify_artist, spotify_album, spotify_album_id 
-           FROM album_mappings 
+        """SELECT spotify_artist, spotify_album, spotify_album_id
+           FROM album_mappings
            WHERE extracted_artist=? AND extracted_album=? AND playlist_id=?""",
         (extracted_artist, extracted_album, playlist_id),
     )
@@ -122,7 +125,7 @@ def record_album_mapping(
 ):
     """
     Record a mapping between extracted names and Spotify album details.
-    
+
     Args:
         conn: Database connection
         extracted_artist: Artist name as extracted from email (comma-separated)
@@ -135,17 +138,15 @@ def record_album_mapping(
     # Validate Spotify ID before storing
     if not is_valid_spotify_id(spotify_album_id):
         raise ValueError(f"Invalid Spotify album ID: '{spotify_album_id}' - must be 22 alphanumeric characters")
-    
+
     cur = conn.cursor()
-    mapping_id = hashlib.sha256(
-        (extracted_artist + extracted_album + playlist_id).encode()
-    ).hexdigest()
-    
+    mapping_id = hashlib.sha256((extracted_artist + extracted_album + playlist_id).encode()).hexdigest()
+
     # Use INSERT OR REPLACE to handle duplicates
     cur.execute(
-        """INSERT OR REPLACE INTO album_mappings 
-           (mapping_id, extracted_artist, extracted_album, playlist_id, 
-            spotify_artist, spotify_album, spotify_album_id, created_at) 
+        """INSERT OR REPLACE INTO album_mappings
+           (mapping_id, extracted_artist, extracted_album, playlist_id,
+            spotify_artist, spotify_album, spotify_album_id, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             mapping_id,

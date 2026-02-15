@@ -11,14 +11,15 @@ This script:
 import sqlite3
 from collections import defaultdict
 
+from src.config import load_config
 from src.db.playlist_db import get_db_connection
-from src.spotify.spotify import auth_params, settings, spotify
+from src.spotify.spotify import auth_params, spotify
 
 
 def get_playlist_tracks_from_db(conn: sqlite3.Connection) -> dict[str, dict]:
     """
     Get all playlists and their tracks from the database.
-    
+
     Returns:
         dict: {playlist_id: {
             'name': playlist_name,
@@ -27,19 +28,19 @@ def get_playlist_tracks_from_db(conn: sqlite3.Connection) -> dict[str, dict]:
     """
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT playlist_id, playlist_name, id 
-        FROM playlists 
+        SELECT playlist_id, playlist_name, id
+        FROM playlists
         WHERE id IS NOT NULL
         ORDER BY playlist_name
     """)
 
-    playlists = defaultdict(lambda: {'name': '', 'tracks': []})
+    playlists = defaultdict(lambda: {"name": "", "tracks": []})
 
     for row in cursor.fetchall():
         playlist_id, playlist_name, track_id = row
-        if not playlists[playlist_id]['name']:
-            playlists[playlist_id]['name'] = playlist_name
-        playlists[playlist_id]['tracks'].append(track_id)
+        if not playlists[playlist_id]["name"]:
+            playlists[playlist_id]["name"] = playlist_name
+        playlists[playlist_id]["tracks"].append(track_id)
 
     return dict(playlists)
 
@@ -47,17 +48,17 @@ def get_playlist_tracks_from_db(conn: sqlite3.Connection) -> dict[str, dict]:
 def get_spotify_playlist_track_count(spot_client: spotify, playlist_id: str) -> int:
     """
     Get the number of tracks in a Spotify playlist.
-    
+
     Args:
         spot_client: Authenticated Spotify client
         playlist_id: Spotify playlist ID
-        
+
     Returns:
         Number of tracks in the playlist
     """
     try:
         result = spot_client._construct_call(f"playlists/{playlist_id}")
-        return result['tracks']['total']
+        return result["tracks"]["total"]
     except Exception as e:
         print(f"Error getting playlist {playlist_id}: {e}")
         return -1
@@ -78,11 +79,11 @@ def sync_playlists():
 
     # Setup Spotify client
     print("\nSetting up Spotify connection...")
-    setting_vars = settings()
+    config = load_config()
     auth_params_obj = auth_params(
-        client_id=setting_vars.SPOTIFY_CLIENT_ID,
-        client_secret=setting_vars.SPOTIFY_CLIENT_SECRET,
-        scope=setting_vars.SPOTIFY_SCOPES,
+        client_id=config.spotify.client_id,
+        client_secret=config.spotify.client_secret,
+        scope=config.spotify.scopes,
         state="state",
     )
 
@@ -96,8 +97,8 @@ def sync_playlists():
     skipped_count = 0
 
     for playlist_id, playlist_data in db_playlists.items():
-        playlist_name = playlist_data['name']
-        tracks = playlist_data['tracks']
+        playlist_name = playlist_data["name"]
+        tracks = playlist_data["tracks"]
 
         print(f"\n📋 Checking: {playlist_name} ({playlist_id})")
         print(f"   Database has {len(tracks)} tracks")
@@ -135,11 +136,11 @@ def sync_playlists():
     db_conn.close()
 
     # Summary
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("Sync complete!")
     print(f"  Synced: {synced_count} playlists")
     print(f"  Skipped: {skipped_count} playlists")
-    print("="*50)
+    print("=" * 50)
 
 
 if __name__ == "__main__":

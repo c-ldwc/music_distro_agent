@@ -8,7 +8,6 @@ from typing import Annotated, Any
 import flask
 import httpx
 from pydantic import AfterValidator, BaseModel
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from werkzeug.serving import make_server  # For graceful server shutdown
 
 from src import classes
@@ -54,15 +53,6 @@ def callback():
     return "<h1>Error</h1><p>No code received.</p>", 400
 
 
-class settings(BaseSettings):
-    SPOTIFY_CLIENT_ID: str
-    SPOTIFY_CLIENT_SECRET: str
-    SPOTIFY_SCOPES: str
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
-
-
 # --- Server Threading Class ---
 class ServerThread(threading.Thread):
     """Runs the Flask server in a background thread."""
@@ -101,9 +91,9 @@ class spotify_auth(BaseModel):
     scope: str
 
 
-def length_check(s: str, l: int) -> str:
-    if len(s) != l:
-        raise ValueError(f"{s} is not a string of length {l}")
+def length_check(s: str, length: int) -> str:
+    if len(s) != length:
+        raise ValueError(f"{s} is not a string of length {length}")
     return s
 
 
@@ -174,14 +164,10 @@ class spotify(BaseModel):
         def search_type_val(s: str) -> str:
             search_types = ["album", "artist", "track"]
             if s not in search_types:
-                raise ValueError(
-                    f"Search type is {s} but must be one of {search_types}"
-                )
+                raise ValueError(f"Search type is {s} but must be one of {search_types}")
             return s
 
-        def id_title(
-            i: dict[str, Any], search_type: str
-        ) -> list[classes.album] | list[dict[str, str]]:
+        def id_title(i: dict[str, Any], search_type: str) -> list[classes.album] | list[dict[str, str]]:
             out = []
             for res in i[search_type + "s"]["items"]:
                 if search_type == "album":
@@ -220,9 +206,7 @@ class spotify(BaseModel):
         def process_tracks(call: dict[str, Any]) -> list[str]:
             return [i["id"] for i in call["items"]]
 
-        call = self._construct_call(
-            endpoint=f"albums/{id}/tracks", params={"Market": market, "limit": 50}
-        )
+        call = self._construct_call(endpoint=f"albums/{id}/tracks", params={"Market": market, "limit": 50})
         result = process_tracks(call)
 
         while call["next"] is not None:
@@ -231,14 +215,10 @@ class spotify(BaseModel):
         return result
 
     def playlist_exist(self, id: str) -> bool:
-        if "error" in self._construct_call(f"playlists/{id}"):
-            return False
-        return True
+        return "error" not in self._construct_call(f"playlists/{id}")
 
     def get_playlist_by_name(self, name: str):
-        call = self._construct_call(
-            f"users/{self.user_id}/playlists", params={"limit": 50}
-        )
+        call = self._construct_call(f"users/{self.user_id}/playlists", params={"limit": 50})
         names = [i["name"] for i in call["items"]]
         if name in names:
             playlist = call["items"][names.index(name)]
@@ -252,14 +232,10 @@ class spotify(BaseModel):
 
         return None
 
-    def create_playlist(
-        self, name: str, public: bool = True, collaborative: bool = False
-    ):
-        body = {"name": name, "public": True, "collaborative": False, "description": ""}
+    def create_playlist(self, name: str, public: bool = True, collaborative: bool = False):
+        body = {"name": name, "public": public, "collaborative": collaborative, "description": ""}
 
-        result = self._construct_call(
-            endpoint=f"users/{self.user_id}/playlists", method="POST", data=body
-        )
+        result = self._construct_call(endpoint=f"users/{self.user_id}/playlists", method="POST", data=body)
         return {i: result[i] for i in result if i in ["id", "href"]}
 
     def add_to_playlist(
@@ -293,9 +269,7 @@ class spotify(BaseModel):
         """Starts the a Flask server, gets the code, and exchanges it for tokens."""
         # 1. Start the Flask server thread
         server_thread = ServerThread(app)
-        server_thread.daemon = (
-            True  # Allow the main script to exit even if the thread is running
-        )
+        server_thread.daemon = True  # Allow the main script to exit even if the thread is running
         server_thread.start()
 
         # 2. Construct and open the Authorization URL
@@ -331,9 +305,7 @@ class spotify(BaseModel):
 
         try:
             time = datetime.now()
-            expiry_time = time + timedelta(
-                seconds=3300
-            )  # expires in an hour but lets be conservative
+            expiry_time = time + timedelta(seconds=3300)  # expires in an hour but lets be conservative
             token_response = httpx.post(
                 "https://accounts.spotify.com/api/token",
                 data={
@@ -362,11 +334,13 @@ class spotify(BaseModel):
 
 
 if __name__ == "__main__":
-    setting_vars = settings()
+    from src.config import load_config
+
+    config = load_config()
     a = auth_params(
-        client_id=setting_vars.SPOTIFY_CLIENT_ID,
-        client_secret=setting_vars.SPOTIFY_CLIENT_SECRET,
-        scope=setting_vars.SPOTIFY_SCOPES,
+        client_id=config.spotify.client_id,
+        client_secret=config.spotify.client_secret,
+        scope=config.spotify.scopes,
         state="state",
     )
 

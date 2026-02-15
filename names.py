@@ -20,7 +20,14 @@ def get_playlist_tracks(conn: Connection, playlist_id: str):
     track_rows = cur.fetchall()
     return track_rows
 
+
 if __name__ == "__main__":
     conn = get_db_connection()
 
-    print([i for i in conn.cursor().execute("select distinct playlist_id, playlist_name from playlists order by playlist_name desc")])
+    print(
+        list(
+            conn.cursor().execute(
+                "select distinct playlist_id, playlist_name from playlists order by playlist_name desc"
+            )
+        )
+    )
