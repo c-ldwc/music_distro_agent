@@ -33,11 +33,11 @@ def email_validator(e: str) -> str:
     #    return p
 
 
-def process_env_list(l: str) -> list[str]:
-    print(l)
+def process_env_list(list_str: str) -> list[str]:
+    print(list_str)
     # Format a string that represents a list into a list of strings
     # i.e. "[a,b,something_else]" -> ["a", "b", "something_else"]
-    return [sub(r"[\s\[\]]", "", i) for i in l.split(",")]
+    return [sub(r"[\s\[\]]", "", i) for i in list_str.split(",")]
 
 
 class gmail_auth_context(BaseModel):
@@ -176,70 +176,71 @@ class gmail(BaseModel):
             if "parts" in this_email["payload"]:
                 for part in this_email["payload"]["parts"]:
                     # Check if it's an email attachment (usually .eml file or message/rfc822)
-                    if "filename" in part and part["filename"].endswith(".eml") or part["mimeType"] == "message/rfc822":
-                        if "attachmentId" in part["body"]:
-                            found_attachments = True
-                            attach = (
-                                message_api.attachments()
-                                .get(
-                                    userId=userID,
-                                    messageId=m["id"],
-                                    id=part["body"]["attachmentId"],
-                                    # Set a large maxBytes limit to prevent truncation
-                                    # Gmail API default can truncate at 25MB, but we increase to 50MB
-                                    maxBytes=52428800,  # 50MB in bytes
-                                )
-                                .execute()
+                    if (
+                        "filename" in part and part["filename"].endswith(".eml") or part["mimeType"] == "message/rfc822"
+                    ) and "attachmentId" in part["body"]:
+                        found_attachments = True
+                        attach = (
+                            message_api.attachments()
+                            .get(
+                                userId=userID,
+                                messageId=m["id"],
+                                id=part["body"]["attachmentId"],
+                                # Set a large maxBytes limit to prevent truncation
+                                # Gmail API default can truncate at 25MB, but we increase to 50MB
+                                maxBytes=52428800,  # 50MB in bytes
                             )
-                            # Attachment data is urlsafe base64 encoded
-                            # Add padding if needed for proper base64 decoding
-                            attachment_data = attach["data"]
-                            padding_needed = (4 - len(attachment_data) % 4) % 4
-                            if padding_needed:
-                                attachment_data += "=" * padding_needed
-                            bytes_eml = base64.urlsafe_b64decode(attachment_data)
+                            .execute()
+                        )
+                        # Attachment data is urlsafe base64 encoded
+                        # Add padding if needed for proper base64 decoding
+                        attachment_data = attach["data"]
+                        padding_needed = (4 - len(attachment_data) % 4) % 4
+                        if padding_needed:
+                            attachment_data += "=" * padding_needed
+                        bytes_eml = base64.urlsafe_b64decode(attachment_data)
 
-                            # Parse .eml content
-                            eml = email.message_from_bytes(bytes_eml, policy=policy.default)
+                        # Parse .eml content
+                        eml = email.message_from_bytes(bytes_eml, policy=policy.default)
 
-                            # Extract date
-                            date_val: str | None = eml.get("Date")
-                            if date_val:
-                                try:
-                                    # Format is usually like "Fri, 19 Dec 2024 10:00:39 +0000"
-                                    # We take the part between comma and timezone offset roughly
-                                    date_clean = date_val.split(",")[1][:-5].strip()
-                                    date = datetime.strptime(date_clean, "%d %b %Y %H:%M:%S")
-                                except (ValueError, IndexError):
-                                    date = datetime.now()
-                            else:
-                                date = datetime.now()
-
-                            # Extract body from the attached email
+                        # Extract date
+                        date_val: str | None = eml.get("Date")
+                        if date_val:
                             try:
-                                body = eml.get_body(preferencelist=("plain"))
-                                if body:
-                                    body_content = body.get_content()
-                                else:
-                                    # Fallback if get_body fails to find plain text
-                                    body_content = ""
-                                    if eml.is_multipart():
-                                        for sub_part in eml.walk():
-                                            if sub_part.get_content_type() == "text/plain":
-                                                body_content = sub_part.get_content()
-                                                break
-                                    else:
-                                        body_content = eml.get_payload(decode=True).decode("utf-8")
-                            except Exception as e:
-                                print(f"Error parsing body from attachment: {e}")
-                                body_content = ""
+                                # Format is usually like "Fri, 19 Dec 2024 10:00:39 +0000"
+                                # We take the part between comma and timezone offset roughly
+                                date_clean = date_val.split(",")[1][:-5].strip()
+                                date = datetime.strptime(date_clean, "%d %b %Y %H:%M:%S")
+                            except (ValueError, IndexError):
+                                date = datetime.now()
+                        else:
+                            date = datetime.now()
 
-                            # Save attached email content
-                            if body_content:
-                                email_for_agent = boom_email(date=date, body=body_content)
-                                with open(self.email_dir / f"attach_{current_attach}.txt", "w") as f:
-                                    f.write(email_for_agent.model_dump_json(indent=2))
-                                current_attach += 1
+                        # Extract body from the attached email
+                        try:
+                            body = eml.get_body(preferencelist=("plain"))
+                            if body:
+                                body_content = body.get_content()
+                            else:
+                                # Fallback if get_body fails to find plain text
+                                body_content = ""
+                                if eml.is_multipart():
+                                    for sub_part in eml.walk():
+                                        if sub_part.get_content_type() == "text/plain":
+                                            body_content = sub_part.get_content()
+                                            break
+                                else:
+                                    body_content = eml.get_payload(decode=True).decode("utf-8")
+                        except Exception as e:
+                            print(f"Error parsing body from attachment: {e}")
+                            body_content = ""
+
+                        # Save attached email content
+                        if body_content:
+                            email_for_agent = boom_email(date=date, body=body_content)
+                            with open(self.email_dir / f"attach_{current_attach}.txt", "w") as f:
+                                f.write(email_for_agent.model_dump_json(indent=2))
+                            current_attach += 1
 
             # If no email attachments found, process the main email body
             if not found_attachments:
