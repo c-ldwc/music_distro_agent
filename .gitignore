@@ -30,3 +30,4 @@ playlists.db
 # Logs
 *.log
 logs/
+uv.lock
