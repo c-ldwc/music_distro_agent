@@ -153,7 +153,7 @@ def sample_playlist():
     """Sample Spotify playlist response."""
     return {
         "id": "test_playlist_id_123",
-        "name": "Boomkat 2026-02-05",
+        "name": "Playlist 2026-02-05",
         "description": "",
         "tracks": {"total": 0},
     }

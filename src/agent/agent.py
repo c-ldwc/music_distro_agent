@@ -129,7 +129,7 @@ class ExtractionAgent(classes.Agent[list[classes.extract_release]]):
     prompt: str = extraction_prompt
     response_format: dict[str, Any] = extraction_format
 
-    def _run(self, email: classes.boom_email) -> list[classes.extract_release]:
+    def _run(self, email: classes.music_source) -> list[classes.extract_release]:
         """
         Extract releases from email.
 

@@ -44,7 +44,7 @@ def cli():
 @click.option(
     "--log-level", default="INFO", type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"]), help="Logging level"
 )
-@click.option("--path", default="boomkat_emails", type=str)
+@click.option("--path", default="sources", type=str)
 def process(limit: int | None, log_level: str, path=str | None):
     """Process emails and create Spotify playlists.
 
@@ -315,10 +315,10 @@ def download(log_level: str):
     "-p",
     type=str,
     default=None,
-    help="Playlist name to associate with this email (defaults to 'Boomkat <date>')",
+    help="Playlist name to associate with this source (defaults to 'Playlist <date>')",
 )
 def scrape(url: str, output: str | None, body: bool, script: bool, date: str | None, playlist_name: str | None):
-    """Scrape a URL and save it as a boom_email JSON file."""
+    """Scrape a URL and save it as a source JSON file for processing."""
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
