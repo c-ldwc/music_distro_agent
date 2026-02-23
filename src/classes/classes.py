@@ -11,6 +11,7 @@ from ..helpers import retry
 class boom_email(BaseModel):
     date: datetime
     body: str
+    playlist_name: str | None = None
 
 
 class album(BaseModel):

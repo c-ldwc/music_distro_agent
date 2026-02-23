@@ -7,9 +7,16 @@ Provides commands for:
 - download: Download new emails from Gmail
 """
 
+import json
+import os
+import re
 import sys
+from datetime import datetime
+from pathlib import Path
 
 import click
+import httpx
+from bs4 import BeautifulSoup
 from httpx import HTTPStatusError
 from langchain.tools import tool
 
@@ -33,10 +40,12 @@ def cli():
 
 
 @cli.command()
-@click.option('--limit', default=10, type=int, help='Maximum number of emails to process')
-@click.option('--log-level', default='INFO', type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']),
-              help='Logging level')
-def process(limit: int, log_level: str):
+@click.option("--limit", default=10, type=int, help="Maximum number of emails to process")
+@click.option(
+    "--log-level", default="INFO", type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"]), help="Logging level"
+)
+@click.option("--path", default="boomkat_emails", type=str)
+def process(limit: int, log_level: str, path=str | None):
     """Process emails and create Spotify playlists.
 
     Reads emails from the configured directory, extracts music releases
@@ -55,6 +64,9 @@ def process(limit: int, log_level: str):
         logger.error(f"Failed to load configuration: {e}")
         logger.error("Please ensure .env file is configured correctly")
         sys.exit(1)
+
+    if path:
+        config.email.path = Path(path)
 
     # Initialize and authenticate Spotify
     module_logger.info("Initializing Spotify client...")
@@ -85,14 +97,8 @@ def process(limit: int, log_level: str):
     # Initialize AI agents
     module_logger.info("Initializing AI agents...")
     agents = {
-        'extract': ExtractionAgent(
-            api_key=config.anthropic.api_key,
-            temperature=0.0
-        ),
-        'search': SearchAgent(
-            api_key=config.anthropic.api_key,
-            temperature=0.0
-        )
+        "extract": ExtractionAgent(api_key=config.anthropic.api_key, temperature=0.0),
+        "search": SearchAgent(api_key=config.anthropic.api_key, temperature=0.0),
     }
 
     # Connect to database
@@ -125,8 +131,9 @@ def process(limit: int, log_level: str):
 
 
 @cli.command()
-@click.option('--log-level', default='INFO', type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']),
-              help='Logging level')
+@click.option(
+    "--log-level", default="INFO", type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"]), help="Logging level"
+)
 def sync(log_level: str):
     """Sync playlists from database to Spotify.
 
@@ -230,8 +237,9 @@ def sync(log_level: str):
 
 
 @cli.command()
-@click.option('--log-level', default='INFO', type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']),
-              help='Logging level')
+@click.option(
+    "--log-level", default="INFO", type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"]), help="Logging level"
+)
 def download(log_level: str):
     """Download new emails from Gmail.
 
@@ -281,6 +289,46 @@ def download(log_level: str):
     except Exception as e:
         logger.error(f"Failed to download emails: {e}")
         sys.exit(1)
+
+
+@cli.command()
+@click.option("--url", type=str, required=True)
+@click.option("--output", "-o", type=str, default=None)
+@click.option("--body", "-b", is_flag=True, help="Extract only the <body> element")
+@click.option("--script", "-s", is_flag=True, help="Keep <script> and <noscript> tags (only applies with --body)")
+@click.option("--date", "-d", type=str, default=None, help="Email date in ISO format (defaults to now)")
+@click.option(
+    "--playlist-name",
+    "-p",
+    type=str,
+    default=None,
+    help="Playlist name to associate with this email (defaults to 'Boomkat <date>')",
+)
+def scrape(url: str, output: str | None, body: bool, script: bool, date: str | None, playlist_name: str | None):
+    """Scrape a URL and save it as a boom_email JSON file."""
+    response = httpx.get(url=url)
+    response.raise_for_status()
+    if not output:
+        # Use scraped_url as the default and do not overwrite
+        i = len([i for i in os.listdir(".") if re.match("scraped_url", i) is not None])
+        output = f"scraped_url{i}.txt"
+    if body:
+        soup = BeautifulSoup(response.text, "html.parser").find("body")
+        if not script:
+            for sc in soup.find_all("script"):
+                sc.decompose()
+            for nsc in soup.find_all("noscript"):
+                nsc.decompose()
+        text = soup.get_text(separator="\n", strip=True)
+    else:
+        text = response.content.decode()
+
+    email_date = date if date else datetime.now().isoformat()
+    payload: dict = {"date": email_date, "body": text}
+    if playlist_name:
+        payload["playlist_name"] = playlist_name
+    with open(output, "w") as f:
+        json.dump(payload, f, indent=2)
 
 
 if __name__ == "__main__":

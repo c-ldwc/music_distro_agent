@@ -82,7 +82,7 @@ class EmailProcessor:
         self.logger.info(f"Extracted {len(all_artists)} unique artists and {len(all_albums)} albums")
 
         # Create or fetch playlist
-        playlist_name = f"Boomkat {email.date.strftime('%Y-%m-%d')}"
+        playlist_name = email.playlist_name or f"Boomkat {email.date.strftime('%Y-%m-%d')}"
         self.logger.info(f"Creating/fetching playlist: {playlist_name}")
 
         try:
