@@ -40,12 +40,12 @@ def cli():
 
 
 @cli.command()
-@click.option("--limit", default=10, type=int, help="Maximum number of emails to process")
+@click.option("--limit", default=None, type=int, help="Maximum number of emails to process (default from config)")
 @click.option(
     "--log-level", default="INFO", type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"]), help="Logging level"
 )
 @click.option("--path", default="boomkat_emails", type=str)
-def process(limit: int, log_level: str, path=str | None):
+def process(limit: int | None, log_level: str, path=str | None):
     """Process emails and create Spotify playlists.
 
     Reads emails from the configured directory, extracts music releases
@@ -64,6 +64,9 @@ def process(limit: int, log_level: str, path=str | None):
         logger.error(f"Failed to load configuration: {e}")
         logger.error("Please ensure .env file is configured correctly")
         sys.exit(1)
+
+    if limit is None:
+        limit = config.email.max_emails_per_run
 
     if path:
         config.email.path = Path(path)
@@ -97,14 +100,24 @@ def process(limit: int, log_level: str, path=str | None):
     # Initialize AI agents
     module_logger.info("Initializing AI agents...")
     agents = {
-        "extract": ExtractionAgent(api_key=config.anthropic.api_key, temperature=0.0),
-        "search": SearchAgent(api_key=config.anthropic.api_key, temperature=0.0),
+        "extract": ExtractionAgent(
+            api_key=config.anthropic.api_key,
+            model_name=config.anthropic.model_name,
+            max_retries=config.anthropic.max_retries,
+            temperature=0.0,
+        ),
+        "search": SearchAgent(
+            api_key=config.anthropic.api_key,
+            model_name=config.anthropic.model_name,
+            max_retries=config.anthropic.max_retries,
+            temperature=0.0,
+        ),
     }
 
     # Connect to database
     module_logger.info("Connecting to database...")
     try:
-        db_conn = get_db_connection()
+        db_conn = get_db_connection(str(config.database.path))
         module_logger.info("✓ Database connection established")
     except Exception as e:
         module_logger.error(f"Failed to connect to database: {e}")
@@ -155,7 +168,7 @@ def sync(log_level: str):
 
     # Connect to database
     logger.info("Connecting to database...")
-    db_conn = get_db_connection()
+    db_conn = get_db_connection(str(config.database.path))
 
     # Get playlists from database
     logger.info("Reading playlists from database...")
@@ -306,8 +319,33 @@ def download(log_level: str):
 )
 def scrape(url: str, output: str | None, body: bool, script: bool, date: str | None, playlist_name: str | None):
     """Scrape a URL and save it as a boom_email JSON file."""
-    response = httpx.get(url=url)
-    response.raise_for_status()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer": "https://www.google.com/",
+        "Connection": "keep-alive",
+    }
+    try:
+        response = httpx.get(url=url, headers=headers)
+        response.raise_for_status()
+    except HTTPStatusError:
+        from curl_cffi import requests
+
+        headers = {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Referer": "https://www.google.com/",
+        }
+
+        # Use curl_cffi to impersonate a real browser
+        response = requests.get(
+            url,
+            headers=headers,
+            impersonate="chrome120",  # Mimics Chrome's TLS fingerprint
+            # follow_redirects=True  # Requests API uses 'allow_redirects'
+        )
     if not output:
         # Use scraped_url as the default and do not overwrite
         i = len([i for i in os.listdir(".") if re.match("scraped_url", i) is not None])

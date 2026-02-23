@@ -22,5 +22,5 @@ def retry[T](method: Callable[[], T], args: dict[str, Any], retries: int = 3) ->
         except Exception as err:
             tries += 1
             sleep(random() + 0.5)
-            if tries == 3:
+            if tries == retries:
                 raise err

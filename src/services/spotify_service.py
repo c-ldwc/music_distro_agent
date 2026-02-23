@@ -28,6 +28,7 @@ class SpotifyService:
             client_id=self.config.client_id,
             client_secret=self.config.client_secret,
             scope=self.config.scopes,
+            redirect_uri=self.config.redirect_uri,
             state="state",
         )
         self.client = spotify(auth_params=auth)

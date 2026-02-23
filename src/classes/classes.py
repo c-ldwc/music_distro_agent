@@ -51,6 +51,7 @@ class Agent[T](BaseModel):
     response_format: dict[str, Any] | None = None
     temperature: float = 0.0  # Deterministic by default
     max_tokens: int = 4096  # Control output length
+    max_retries: int = 3
 
     def model_post_init(self, context: Any, /) -> None:  # noqa: ARG002
         self.model = ChatAnthropic(
@@ -62,7 +63,7 @@ class Agent[T](BaseModel):
         )
 
     def run(self, **kwargs) -> T | None:
-        return retry(method=self._run, args=kwargs, retries=3)
+        return retry(method=self._run, args=kwargs, retries=self.max_retries)
 
     # Todo
     def _run(self, **kwargs) -> T:

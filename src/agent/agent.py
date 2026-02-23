@@ -18,7 +18,7 @@ logger = logging.getLogger("spotify_automation.agent")
 # Prompts and Schemas
 ###
 extraction_prompt = """
-You are extracting music releases from a distributor email to create Spotify playlists.
+You are extracting music releases from a distributor email or website to create Spotify playlists.
 
 EXTRACTION RULES:
 1. Extract ALL artist-album pairs mentioned in the email body
@@ -28,6 +28,7 @@ EXTRACTION RULES:
    - Merchandise, tickets, or non-music items
    - Editorial commentary without specific releases
    - Duplicate mentions of the same artist-album pair
+   - Albums that are mentioned as part of a description i.e. ("for fans of X", or "Sound like Y")
 
 FORMAT REQUIREMENTS:
 - Artists: Return as array, include ALL credited artists (e.g., ["Artist A", "Artist B"])

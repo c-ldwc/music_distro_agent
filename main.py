@@ -71,14 +71,24 @@ def main():
     # Initialize AI agents
     module_logger.info("Initializing AI agents...")
     agents = {
-        "extract": ExtractionAgent(api_key=config.anthropic.api_key, temperature=0.0),
-        "search": SearchAgent(api_key=config.anthropic.api_key, temperature=0.0),
+        "extract": ExtractionAgent(
+            api_key=config.anthropic.api_key,
+            model_name=config.anthropic.model_name,
+            max_retries=config.anthropic.max_retries,
+            temperature=0.0,
+        ),
+        "search": SearchAgent(
+            api_key=config.anthropic.api_key,
+            model_name=config.anthropic.model_name,
+            max_retries=config.anthropic.max_retries,
+            temperature=0.0,
+        ),
     }
 
     # Connect to database
     module_logger.info("Connecting to database...")
     try:
-        db_conn = get_db_connection()
+        db_conn = get_db_connection(str(config.database.path))
         module_logger.info("✓ Database connection established")
     except Exception as e:
         module_logger.error(f"Failed to connect to database: {e}")
@@ -86,7 +96,7 @@ def main():
 
     # Process emails
     processor = EmailProcessor(config, spotify_service, agents, db_conn, module_logger)
-    stats = processor.process_all_emails(search_tool=search, limit=10)
+    stats = processor.process_all_emails(search_tool=search, limit=config.email.max_emails_per_run)
 
     # Print summary
     module_logger.info("=" * 60)
