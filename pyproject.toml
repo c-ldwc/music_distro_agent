@@ -1,7 +1,7 @@
 [project]
 name = "spotify"
 version = "0.1.0"
-description = "Automated Spotify playlist creation from Boomkat emails using AI"
+description = "Automated Spotify playlist creation from music distributor emails and web pages using AI"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

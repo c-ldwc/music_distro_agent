@@ -12,7 +12,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from pydantic import AfterValidator, BaseModel
 
-from .classes import boom_email
+from .classes import music_source
 
 
 def json_path_validator(p: str) -> str:
@@ -76,8 +76,8 @@ class gmail(BaseModel):
 
     def get_attachment_flow(self, source_account: Annotated[str, AfterValidator(email_validator)]) -> None:
         """
-        One off to populate the boomkat directory. I sent
-        an email with a bunch of boomkat messages attached as emls
+        One off to populate the sources directory. I sent
+        an email with a bunch of messages attached as emls
         Read this email and pull the attachments
         """
         # Call the Gmail API
@@ -117,7 +117,7 @@ class gmail(BaseModel):
                         date = date.split(",")[1][:-5].strip()
                         body: str = eml.get_body(preferencelist=("plain")).get_content()
                         date = datetime.strptime(date, "%d %b %Y %H:%M:%S")
-                        email_for_agent = boom_email(date=date, body=body)
+                        email_for_agent = music_source(date=date, body=body)
                         with open(self.email_dir / f"attach_{current_attach}.txt", "w") as f:
                             f.write(email_for_agent.model_dump_json(indent=2))
                         current_attach += 1
@@ -150,7 +150,7 @@ class gmail(BaseModel):
         Emails are saved as JSON files with date and body content.
         Handles both direct emails and emails forwarded as .eml attachments.
         """
-        from .classes import boom_email
+        from .classes import music_source
 
         service = build("gmail", "v1", credentials=self._creds)
         profile = service.users().getProfile(userId="me").execute()
@@ -237,7 +237,7 @@ class gmail(BaseModel):
 
                         # Save attached email content
                         if body_content:
-                            email_for_agent = boom_email(date=date, body=body_content)
+                            email_for_agent = music_source(date=date, body=body_content)
                             with open(self.email_dir / f"attach_{current_attach}.txt", "w") as f:
                                 f.write(email_for_agent.model_dump_json(indent=2))
                             current_attach += 1
@@ -262,7 +262,7 @@ class gmail(BaseModel):
 
                 if body:
                     # Save email to file
-                    email_for_agent = boom_email(date=date, body=body)
+                    email_for_agent = music_source(date=date, body=body)
                     with open(self.email_dir / f"attach_{current_attach}.txt", "w") as f:
                         f.write(email_for_agent.model_dump_json(indent=2))
                     current_attach += 1

@@ -18,7 +18,7 @@ token.json
 *.pem
 
 # Data directories
-boomkat_emails/
+sources/
 test_email/
 old/
 
