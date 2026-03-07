@@ -13,6 +13,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from numpy import argsort
 
 import click
 import httpx
@@ -20,6 +21,7 @@ from bs4 import BeautifulSoup
 from httpx import HTTPStatusError
 from langchain.tools import tool
 
+from src import spotify
 from src.agent import ExtractionAgent, SearchAgent
 from src.config import load_config
 from src.db import get_db_connection
@@ -141,6 +143,113 @@ def process(limit: int | None, log_level: str, path=str | None):
     if db_conn:
         db_conn.close()
         module_logger.debug("Database connection closed")
+
+
+@cli.command()
+@click.option("--top-n", "-n", default=5, type=click.INT)
+def get_popular(top_n: int):
+    """Get top N most popular tracks from each album and create a new playlist.
+
+    Creates a new playlist named '{original_name}: Top' containing the most
+    popular tracks from each album in the original playlist. Tracks are stored
+    in the database and can be synced later using 'sync' command.
+    """
+    from src.classes import track
+    from src.db import record_track
+
+    logger = setup_logging()
+    config = load_config()
+    logger.info(f"Connecting to db {config.database.path}")
+    db_conn = get_db_connection(str(config.database.path))
+    logger.info("Connecting to spotify")
+    spotify_service = SpotifyService(config.spotify)
+    spotify_service.authenticate()
+
+    logger.info("Getting playlist tracks")
+    cursor = db_conn.cursor()
+
+    playlists = cursor.execute("select distinct playlist_id, playlist_name from playlists").fetchall()
+    logger.info(f"Found {len(playlists)} playlists to process")
+
+    for playlist_id, playlist_name in playlists:
+        new_name = playlist_name + ": Top"
+        logger.info(f"Processing tracks for {playlist_name}, {playlist_id}")
+
+        # Check if the new playlist already exists
+        existing_playlist = spotify_service.client.get_playlist_by_name(new_name)
+
+        if existing_playlist:
+            new_playlist_id = existing_playlist["id"]
+            logger.info(f"✓ Playlist '{new_name}' already exists with ID: {new_playlist_id}")
+        else:
+            # Create new playlist
+            logger.info(f"Creating new playlist: {new_name}")
+            new_playlist = spotify_service.client.create_playlist(name=new_name, public=True)
+            new_playlist_id = new_playlist["id"]
+            logger.info(f"✓ Created playlist with ID: {new_playlist_id}")
+
+        albums = cursor.execute(
+            "select distinct artist, album from playlists where playlist_id =?", (playlist_id,)
+        ).fetchall()
+
+        logger.info(f"Processing {len(albums)} albums")
+        all_top_tracks = []
+
+        for artist, album in albums:
+            logger.info(f"  Processing {artist}: {album}")
+            ids = cursor.execute(
+                """
+                SELECT distinct id
+                FROM playlists
+                where artist = ? and album = ?""",
+                (artist, album),
+            ).fetchall()
+
+            track_ids = []
+            for row in ids:
+                track_ids.append(row[0])
+
+            if not track_ids:
+                logger.warning(f"  No tracks found for {artist}: {album}")
+                continue
+
+            logger.info(f"  Found {len(track_ids)} tracks")
+            ids_str = ",".join(track_ids)
+
+            try:
+                tracks = spotify_service.client.get_tracks(ids=ids_str)
+
+                # Sort by popularity (descending) and get top N
+                popularity = [t["popularity"] for t in tracks]
+                # argsort gives ascending order, so reverse to get highest first
+                idx = argsort(popularity)[::-1][:top_n]
+
+                # Record each top track in database
+                for i in idx:
+                    track_info = tracks[i]
+                    track_obj = track(
+                        artist=artist,
+                        album=album,
+                        track_id=track_info["id"]
+                    )
+                    record_track(db_conn, track_obj, new_name, new_playlist_id)
+                    all_top_tracks.append(track_info["id"])
+                    logger.debug(f"    ✓ Recorded: {track_info['name']} (popularity: {track_info['popularity']})")
+
+                logger.info(f"  ✓ Recorded top {len(idx)} tracks from {album}")
+
+            except Exception as e:
+                logger.error(f"  ✗ Error processing tracks for {artist}: {album} - {e}")
+                continue
+
+        logger.info(f"✅ Completed playlist '{new_name}': {len(all_top_tracks)} total tracks recorded")
+        logger.info(f"   Use 'spotify-automation sync' to add tracks to Spotify")
+
+    # Cleanup
+    db_conn.close()
+    logger.info("=" * 60)
+    logger.info("All playlists processed successfully!")
+    logger.info("=" * 60)
 
 
 @cli.command()

@@ -11,6 +11,7 @@ from pydantic import AfterValidator, BaseModel
 from werkzeug.serving import make_server  # For graceful server shutdown
 
 from src import classes
+import json
 
 # --- Configuration ---
 
@@ -213,6 +214,17 @@ class spotify(BaseModel):
             call = self._paginate(call["next"])
             result.extend(process_tracks(call))
         return result
+
+    def get_tracks(
+        self, ids: list[str] | str, market: Annotated[str, AfterValidator(lambda x: length_check(x, 2))] = "AU"
+    ) -> list[dict[str, Any]]:
+        if isinstance(ids, list):
+            ids = ",".join(ids)
+        call = self._construct_call(endpoint="/tracks", params={"market": market, "ids": ids, "limit": 50})
+        print(call.keys())
+        items = call["tracks"]
+
+        return items
 
     def playlist_exist(self, id: str) -> bool:
         return "error" not in self._construct_call(f"playlists/{id}")
