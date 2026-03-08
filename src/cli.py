@@ -147,7 +147,8 @@ def process(limit: int | None, log_level: str, path=str | None):
 
 @cli.command()
 @click.option("--top-n", "-n", default=5, type=click.INT)
-def get_popular(top_n: int):
+@click.option("--name-filter", default=None, type=click.STRING)
+def get_popular(top_n: int, name_filter: str | None = None):
     """Get top N most popular tracks from each album and create a new playlist.
 
     Creates a new playlist named '{original_name}: Top' containing the most
@@ -165,10 +166,16 @@ def get_popular(top_n: int):
     spotify_service = SpotifyService(config.spotify)
     spotify_service.authenticate()
 
+    logger.info(name_filter)
     logger.info("Getting playlist tracks")
     cursor = db_conn.cursor()
-
-    playlists = cursor.execute("select distinct playlist_id, playlist_name from playlists").fetchall()
+    playlist_qry = """select distinct playlist_id, playlist_name 
+    from playlists
+    where playlist_name not like '%Top'
+    """
+    if name_filter:
+        playlist_qry += f"and playlist_name {name_filter}"
+    playlists = cursor.execute(playlist_qry).fetchall()
     logger.info(f"Found {len(playlists)} playlists to process")
 
     for playlist_id, playlist_name in playlists:
@@ -227,11 +234,7 @@ def get_popular(top_n: int):
                 # Record each top track in database
                 for i in idx:
                     track_info = tracks[i]
-                    track_obj = track(
-                        artist=artist,
-                        album=album,
-                        track_id=track_info["id"]
-                    )
+                    track_obj = track(artist=artist, album=album, track_id=track_info["id"])
                     record_track(db_conn, track_obj, new_name, new_playlist_id)
                     all_top_tracks.append(track_info["id"])
                     logger.debug(f"    ✓ Recorded: {track_info['name']} (popularity: {track_info['popularity']})")
@@ -411,6 +414,142 @@ def download(log_level: str):
     except Exception as e:
         logger.error(f"Failed to download emails: {e}")
         sys.exit(1)
+
+
+@cli.command()
+@click.option(
+    "--log-level", default="INFO", type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"]), help="Logging level"
+)
+@click.option("--playlist-id", "-p", type=str, default=None, help="Import a specific playlist by ID")
+@click.option("--playlist-name", "-n", type=str, default=None, help="Import a specific playlist by name")
+def import_playlists(log_level: str, playlist_id: str | None, playlist_name: str | None):
+    """Import playlists from Spotify into the database.
+
+    By default, imports all user playlists. Use --playlist-id or --playlist-name
+    to import a specific playlist.
+    """
+    from src.classes import track
+    from src.db import import_spotify_playlist
+
+    # Setup logging
+    setup_logging(log_level=log_level)
+    logger = get_logger(__name__)
+
+    # Load configuration
+    try:
+        config = load_config()
+    except Exception as e:
+        logger.error(f"Failed to load configuration: {e}")
+        sys.exit(1)
+
+    # Connect to database
+    logger.info("Connecting to database...")
+    db_conn = get_db_connection(str(config.database.path))
+
+    # Setup Spotify client
+    logger.info("Setting up Spotify connection...")
+    spotify_service = SpotifyService(config.spotify)
+    spotify_service.authenticate()
+    spot_client = spotify_service.client
+    logger.info("✅ Connected to Spotify")
+
+    # Determine which playlists to import
+    playlists_to_import = []
+
+    if playlist_id:
+        # Import specific playlist by ID
+        logger.info(f"Fetching playlist with ID: {playlist_id}")
+        try:
+            result = spot_client._construct_call(f"playlists/{playlist_id}")
+            playlists_to_import.append(
+                {
+                    "id": result["id"],
+                    "name": result["name"],
+                    "track_count": result["tracks"]["total"],
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to fetch playlist: {e}")
+            db_conn.close()
+            sys.exit(1)
+
+    elif playlist_name:
+        # Import specific playlist by name
+        logger.info(f"Searching for playlist: {playlist_name}")
+        playlist = spot_client.get_playlist_by_name(playlist_name)
+        if not playlist:
+            logger.error(f"Playlist '{playlist_name}' not found")
+            db_conn.close()
+            sys.exit(1)
+
+        # Get full playlist details
+        result = spot_client._construct_call(f"playlists/{playlist['id']}")
+        playlists_to_import.append(
+            {
+                "id": result["id"],
+                "name": result["name"],
+                "track_count": result["tracks"]["total"],
+            }
+        )
+
+    else:
+        # Import all user playlists
+        logger.info("Fetching all user playlists...")
+        playlists_to_import = spot_client.get_user_playlists()
+        logger.info(f"Found {len(playlists_to_import)} playlists")
+
+    # Import each playlist
+    total_imported = 0
+    total_skipped = 0
+
+    for playlist in playlists_to_import:
+        logger.info(f"📋 Importing: {playlist['name']} ({playlist['id']})")
+        logger.info(f"   Tracks: {playlist['track_count']}")
+
+        # Get playlist tracks
+        try:
+            track_data = spot_client.get_playlist_tracks(playlist["id"])
+            logger.info(f"   Fetched {len(track_data)} tracks")
+
+            # Convert to track objects
+            track_objects = [
+                track(
+                    track_id=t["track_id"],
+                    artist=t["artist"],
+                    album=t["album"],
+                )
+                for t in track_data
+            ]
+
+            # Import to database
+            stats = import_spotify_playlist(
+                db_conn,
+                playlist["id"],
+                playlist["name"],
+                track_objects,
+            )
+
+            logger.info(f"   ✅ Imported: {stats['imported']} tracks")
+            if stats["skipped"] > 0:
+                logger.info(f"   ⏭️  Skipped: {stats['skipped']} tracks (already in DB or invalid)")
+
+            total_imported += stats["imported"]
+            total_skipped += stats["skipped"]
+
+        except Exception as e:
+            logger.error(f"   ❌ Error importing playlist: {e}")
+            continue
+
+    # Close database connection
+    db_conn.close()
+
+    # Summary
+    logger.info("=" * 60)
+    logger.info("Import complete!")
+    logger.info(f"  Total playlists processed: {len(playlists_to_import)}")
+    logger.info(f"  Total tracks imported: {total_imported}")
+    logger.info(f"  Total tracks skipped: {total_skipped}")
+    logger.info("=" * 60)
 
 
 @cli.command()

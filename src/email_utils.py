@@ -6,6 +6,8 @@ from pathlib import Path
 from re import match, sub
 from typing import Annotated
 
+from bs4 import BeautifulSoup
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -115,34 +117,52 @@ class gmail(BaseModel):
                         date: str | None = eml.get("Date")
                         # Date has format like Fri, 19 Dec .... Split on , and get datetime string
                         date = date.split(",")[1][:-5].strip()
-                        body: str = eml.get_body(preferencelist=("plain")).get_content()
+                        plain_part = eml.get_body(preferencelist=("plain",))
+                        html_part = eml.get_body(preferencelist=("html",))
+                        if html_part:
+                            body: str = self._html_to_text(html_part.get_content())
+                        elif plain_part:
+                            body: str = plain_part.get_content()
+                        else:
+                            body: str = ""
                         date = datetime.strptime(date, "%d %b %Y %H:%M:%S")
                         email_for_agent = music_source(date=date, body=body)
                         with open(self.email_dir / f"attach_{current_attach}.txt", "w") as f:
                             f.write(email_for_agent.model_dump_json(indent=2))
                         current_attach += 1
 
+    def _html_to_text(self, html: str) -> str:
+        soup = BeautifulSoup(html, "html.parser")
+        for tag in soup.find_all(["script", "noscript", "style"]):
+            tag.decompose()
+        return soup.get_text(separator="\n", strip=True)
+
     def _get_email_body(self, payload: dict) -> str:
         """
-        Recursively extract the plain text body from an email payload.
-        Handles nested multipart emails.
+        Recursively extract the body from an email payload.
+        Prefers HTML (cleaned via BeautifulSoup) over plain text, since
+        Boomkat emails use HTML for content and plain text only as a fallback stub.
         """
-        body = ""
+        html_content = ""
+        plain_fallback = ""
         if "parts" in payload:
             for part in payload["parts"]:
-                # If we find a plain text part with data, return it
-                if part["mimeType"] == "text/plain" and "data" in part["body"]:
-                    return base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8")
-                # If it's a multipart container, recurse into it
+                if part["mimeType"] == "text/html" and "data" in part["body"] and not html_content:
+                    html_content = base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8")
+                elif part["mimeType"] == "text/plain" and "data" in part["body"] and not plain_fallback:
+                    plain_fallback = base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8")
                 elif part["mimeType"].startswith("multipart/"):
                     body = self._get_email_body(part)
                     if body:
                         return body
-        # Handle case where payload itself is text/plain (not multipart)
+        elif payload.get("mimeType") == "text/html" and "body" in payload and "data" in payload["body"]:
+            html_content = base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8")
         elif payload.get("mimeType") == "text/plain" and "body" in payload and "data" in payload["body"]:
-            return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8")
+            plain_fallback = base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8")
 
-        return body
+        if html_content:
+            return self._html_to_text(html_content)
+        return plain_fallback
 
     def fetch_new_emails(self) -> None:
         """
@@ -218,19 +238,25 @@ class gmail(BaseModel):
 
                         # Extract body from the attached email
                         try:
-                            body = eml.get_body(preferencelist=("plain"))
-                            if body:
-                                body_content = body.get_content()
-                            else:
-                                # Fallback if get_body fails to find plain text
+                            plain_part = eml.get_body(preferencelist=("plain",))
+                            html_part = eml.get_body(preferencelist=("html",))
+                            if html_part:
+                                body_content = self._html_to_text(html_part.get_content())
+                            elif plain_part:
+                                body_content = plain_part.get_content()
+                            elif eml.is_multipart():
                                 body_content = ""
-                                if eml.is_multipart():
+                                for sub_part in eml.walk():
+                                    if sub_part.get_content_type() == "text/plain":
+                                        body_content = sub_part.get_content()
+                                        break
+                                if not body_content:
                                     for sub_part in eml.walk():
-                                        if sub_part.get_content_type() == "text/plain":
-                                            body_content = sub_part.get_content()
+                                        if sub_part.get_content_type() == "text/html":
+                                            body_content = self._html_to_text(sub_part.get_content())
                                             break
-                                else:
-                                    body_content = eml.get_payload(decode=True).decode("utf-8")
+                            else:
+                                body_content = eml.get_payload(decode=True).decode("utf-8")
                         except Exception as e:
                             print(f"Error parsing body from attachment: {e}")
                             body_content = ""

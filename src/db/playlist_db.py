@@ -160,3 +160,51 @@ def record_album_mapping(
         ),
     )
     conn.commit()
+
+
+def import_spotify_playlist(conn, playlist_id: str, playlist_name: str, tracks: list[track]):
+    """
+    Import tracks from a Spotify playlist into the database.
+
+    Args:
+        conn: Database connection
+        playlist_id: Spotify playlist ID
+        playlist_name: Playlist name
+        tracks: List of track objects to import
+    """
+    cur = conn.cursor()
+    imported_count = 0
+    skipped_count = 0
+
+    for track_obj in tracks:
+        # Validate track ID
+        if not is_valid_spotify_id(track_obj.track_id):
+            skipped_count += 1
+            continue
+
+        # Check if this track is already in the database for this playlist
+        cur.execute(
+            "SELECT row_id FROM playlists WHERE id=? AND playlist_id=?",
+            (track_obj.track_id, playlist_id),
+        )
+        if cur.fetchone():
+            skipped_count += 1
+            continue
+
+        # Insert the track
+        row_id = hashlib.sha256((track_obj.track_id + playlist_id).encode()).hexdigest()
+        cur.execute(
+            "INSERT INTO playlists (row_id, artist, album, id, playlist_id, playlist_name) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                row_id,
+                track_obj.artist,
+                track_obj.album,
+                track_obj.track_id,
+                playlist_id,
+                playlist_name,
+            ),
+        )
+        imported_count += 1
+
+    conn.commit()
+    return {"imported": imported_count, "skipped": skipped_count}
