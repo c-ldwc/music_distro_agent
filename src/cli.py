@@ -175,6 +175,10 @@ def get_popular(top_n: int, name_filter: str | None = None):
     """
     if name_filter:
         playlist_qry += f"and playlist_name {name_filter}"
+
+    logger.info("Query")
+    for line in playlist_qry.split("\n"):
+        logger.info(f"\tSQL: {line}")
     playlists = cursor.execute(playlist_qry).fetchall()
     logger.info(f"Found {len(playlists)} playlists to process")
 

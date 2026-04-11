@@ -254,22 +254,26 @@ class spotify(BaseModel):
         playlists = []
 
         for item in call["items"]:
-            playlists.append({
-                "id": item["id"],
-                "name": item["name"],
-                "href": item["href"],
-                "track_count": item["tracks"]["total"],
-            })
-
-        while call["next"] is not None:
-            call = self._paginate(call["next"])
-            for item in call["items"]:
-                playlists.append({
+            playlists.append(
+                {
                     "id": item["id"],
                     "name": item["name"],
                     "href": item["href"],
                     "track_count": item["tracks"]["total"],
-                })
+                }
+            )
+
+        while call["next"] is not None:
+            call = self._paginate(call["next"])
+            for item in call["items"]:
+                playlists.append(
+                    {
+                        "id": item["id"],
+                        "name": item["name"],
+                        "href": item["href"],
+                        "track_count": item["tracks"]["total"],
+                    }
+                )
 
         return playlists
 
@@ -293,11 +297,13 @@ class spotify(BaseModel):
             artist = track["artists"][0]["name"] if track["artists"] else "Unknown"
             album = track["album"]["name"] if track["album"] else "Unknown"
 
-            tracks.append({
-                "track_id": track["id"],
-                "artist": artist,
-                "album": album,
-            })
+            tracks.append(
+                {
+                    "track_id": track["id"],
+                    "artist": artist,
+                    "album": album,
+                }
+            )
 
         while call["next"] is not None:
             call = self._paginate(call["next"])
@@ -308,11 +314,13 @@ class spotify(BaseModel):
                 artist = track["artists"][0]["name"] if track["artists"] else "Unknown"
                 album = track["album"]["name"] if track["album"] else "Unknown"
 
-                tracks.append({
-                    "track_id": track["id"],
-                    "artist": artist,
-                    "album": album,
-                })
+                tracks.append(
+                    {
+                        "track_id": track["id"],
+                        "artist": artist,
+                        "album": album,
+                    }
+                )
 
         return tracks
 
@@ -321,6 +329,17 @@ class spotify(BaseModel):
 
         result = self._construct_call(endpoint=f"users/{self.user_id}/playlists", method="POST", data=body)
         return {i: result[i] for i in result if i in ["id", "href"]}
+
+    def get_popular(
+        self, album_id: id, market: Annotated[str, AfterValidator(lambda x: length_check(x, 2))] = "AU"
+    ) -> list[str]:
+        from numpy import argsort
+
+        track_ids = self.get_album_tracks(id=id, market=market)
+        tracks = self.get_tracks(ids=tracks, market=market)
+        popularity = [i["popularity"] for i in tracks]
+
+        argsort(popularity)[::-1]
 
     def add_to_playlist(
         self,
