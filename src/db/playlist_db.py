@@ -36,6 +36,14 @@ def get_db_connection(db_path: str = "playlists.db") -> sqlite3.Connection:
         )
     """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS processed_sources (
+            body_hash TEXT PRIMARY KEY,
+            processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """
+    )
     return conn
 
 
@@ -158,5 +166,19 @@ def record_album_mapping(
             spotify_album_id,
             datetime.now(),
         ),
+    )
+    conn.commit()
+
+
+def is_source_processed(conn, body_hash: str) -> bool:
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM processed_sources WHERE body_hash=?", (body_hash,))
+    return cur.fetchone() is not None
+
+
+def mark_source_processed(conn, body_hash: str):
+    conn.execute(
+        "INSERT OR IGNORE INTO processed_sources (body_hash, processed_at) VALUES (?, ?)",
+        (body_hash, datetime.now()),
     )
     conn.commit()

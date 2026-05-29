@@ -4,11 +4,12 @@ Pytest configuration and shared fixtures.
 
 import json
 import shutil
-import sqlite3
 import tempfile
 from pathlib import Path
 
 import pytest
+
+from src.db import get_db_connection
 
 
 @pytest.fixture
@@ -78,25 +79,8 @@ def sample_spotify_search_results():
 def temp_database(temp_dir):
     """Create a temporary test database."""
     db_path = temp_dir / "test.db"
-    conn = sqlite3.connect(str(db_path))
-
-    # Create schema
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS playlists (
-            row_id TEXT PRIMARY KEY,
-            id TEXT,
-            playlist_id TEXT,
-            playlist_name TEXT,
-            artist TEXT NOT NULL,
-            album TEXT NOT NULL,
-            attempts INTEGER DEFAULT 0,
-            last_attempt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-
+    conn = get_db_connection(str(db_path))
     yield conn, db_path
-
     conn.close()
 
 
