@@ -1,5 +1,6 @@
 """Email processing service for extracting and matching music releases."""
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from httpx import HTTPStatusError
 
 from src import classes
 from src.agent.exceptions import ExtractionError, NoResultsError
-from src.db import get_album_mapping, record_album_mapping, record_track
+from src.db import get_album_mapping, is_source_processed, mark_source_processed, record_album_mapping, record_track
 from src.utils import is_valid_spotify_id
 
 
@@ -43,7 +44,7 @@ class EmailProcessor:
         Returns:
             Dict with processing stats (albums_found, albums_not_found, etc.)
         """
-        stats = {"albums_found": 0, "albums_not_found": 0, "albums_from_cache": 0, "success": False}
+        stats = {"albums_found": 0, "albums_not_found": 0, "albums_from_cache": 0, "success": False, "skipped": False}
 
         filename = file_path.name
         self.logger.info(f"Processing email: {filename}")
@@ -57,6 +58,12 @@ class EmailProcessor:
             return stats
         except Exception as e:
             self.logger.error(f"Failed to read email file {filename}: {e}")
+            return stats
+
+        body_hash = hashlib.sha256(email.body.encode()).hexdigest()
+        if is_source_processed(self.db, body_hash):
+            self.logger.info(f"Skipping already-processed source: {filename}")
+            stats["skipped"] = True
             return stats
 
         # Extract releases
@@ -202,6 +209,7 @@ class EmailProcessor:
             f"({stats['albums_from_cache']} from cache), {stats['albums_not_found']} not found"
         )
         stats["success"] = True
+        mark_source_processed(self.db, body_hash)
         return stats
 
     def process_all_emails(self, search_tool, limit=10):
@@ -215,7 +223,14 @@ class EmailProcessor:
         Returns:
             Dict with summary stats
         """
-        summary = {"processed": 0, "success": 0, "errors": 0, "total_albums_found": 0, "total_albums_not_found": 0}
+        summary = {
+            "processed": 0,
+            "skipped": 0,
+            "success": 0,
+            "errors": 0,
+            "total_albums_found": 0,
+            "total_albums_not_found": 0,
+        }
 
         self.logger.info(f"Scanning for emails in {self.config.email.path}")
 
@@ -228,11 +243,14 @@ class EmailProcessor:
                     self.logger.info(f"Reached processing limit of {limit} emails")
                     break
 
-                summary["processed"] += 1
                 file_path = dirpath / email_file
-
                 stats = self.process_email_file(file_path, search_tool)
 
+                if stats["skipped"]:
+                    summary["skipped"] += 1
+                    continue
+
+                summary["processed"] += 1
                 if stats["success"]:
                     summary["success"] += 1
                     summary["total_albums_found"] += stats["albums_found"]

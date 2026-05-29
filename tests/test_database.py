@@ -5,7 +5,7 @@ Tests for database operations.
 import hashlib
 
 from src.classes import track
-from src.db.playlist_db import get_db_connection, record_track
+from src.db.playlist_db import get_db_connection, is_source_processed, mark_source_processed, record_track
 
 
 class TestDatabaseConnection:
@@ -150,3 +150,25 @@ class TestRecordTrack:
         count = cursor.fetchone()[0]
 
         assert count == 2
+
+
+class TestProcessedSources:
+    def test_unseen_hash_returns_false(self, temp_database):
+        conn, _ = temp_database
+        assert is_source_processed(conn, "abc123") is False
+
+    def test_mark_then_check_returns_true(self, temp_database):
+        conn, _ = temp_database
+        mark_source_processed(conn, "abc123")
+        assert is_source_processed(conn, "abc123") is True
+
+    def test_mark_twice_does_not_raise(self, temp_database):
+        conn, _ = temp_database
+        mark_source_processed(conn, "abc123")
+        mark_source_processed(conn, "abc123")  # INSERT OR IGNORE — should not raise
+
+    def test_different_hashes_are_independent(self, temp_database):
+        conn, _ = temp_database
+        mark_source_processed(conn, "hash_a")
+        assert is_source_processed(conn, "hash_a") is True
+        assert is_source_processed(conn, "hash_b") is False
