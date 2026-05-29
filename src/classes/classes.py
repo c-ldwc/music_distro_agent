@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from ..helpers import retry
 
 
-class boom_email(BaseModel):
+class music_source(BaseModel):
     date: datetime
     body: str
     playlist_name: str | None = None

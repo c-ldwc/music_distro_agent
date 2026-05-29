@@ -18,7 +18,7 @@ token.json
 *.pem
 
 # Data directories
-boomkat_emails/
+sources/
 test_email/
 old/
 
@@ -31,3 +31,6 @@ playlists.db
 *.log
 logs/
 uv.lock
+
+# Jupyter checkpoints
+**/.ipynb_checkpoints/

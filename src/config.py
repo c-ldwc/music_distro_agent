@@ -109,7 +109,7 @@ class EmailConfig(BaseSettings):
     """Email processing configuration settings."""
 
     path: Path = Field(
-        default=Path("boomkat_emails"),
+        default=Path("sources"),
         description="Directory for storing downloaded emails",
     )
     max_emails_per_run: int = Field(default=10, description="Maximum number of emails to process in one run")

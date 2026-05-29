@@ -51,7 +51,7 @@ class EmailProcessor:
         try:
             with open(file_path) as f:
                 email_data = json.load(f)
-                email = classes.boom_email(**email_data)
+                email = classes.music_source(**email_data)
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse JSON from {filename}: {e}")
             return stats
@@ -82,7 +82,7 @@ class EmailProcessor:
         self.logger.info(f"Extracted {len(all_artists)} unique artists and {len(all_albums)} albums")
 
         # Create or fetch playlist
-        playlist_name = email.playlist_name or f"Boomkat {email.date.strftime('%Y-%m-%d')}"
+        playlist_name = email.playlist_name or f"Playlist {email.date.strftime('%Y-%m-%d')}"
         self.logger.info(f"Creating/fetching playlist: {playlist_name}")
 
         try:

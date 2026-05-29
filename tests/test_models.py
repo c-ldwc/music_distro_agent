@@ -7,28 +7,28 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from src.classes import album, boom_email, extract_release, playlist, track
+from src.classes import album, extract_release, music_source, playlist, track
 
 
-class TestBoomEmail:
-    """Tests for boom_email model."""
+class TestMusicSource:
+    """Tests for music_source model."""
 
     def test_valid_email(self):
-        """Test creating valid email object."""
-        email = boom_email(date=datetime(2026, 2, 5, 10, 0, 0), body="Test email body")
+        """Test creating valid music_source object."""
+        email = music_source(date=datetime(2026, 2, 5, 10, 0, 0), body="Test email body")
         assert email.date.year == 2026
         assert email.body == "Test email body"
 
     def test_string_date_parsing(self):
         """Test that string dates are parsed correctly."""
-        email = boom_email(date="2026-02-05T10:00:00", body="Test body")
+        email = music_source(date="2026-02-05T10:00:00", body="Test body")
         assert isinstance(email.date, datetime)
         assert email.date.year == 2026
 
     def test_missing_body_fails(self):
         """Test that missing body field raises error."""
         with pytest.raises(ValidationError):
-            boom_email(date=datetime.now())
+            music_source(date=datetime.now())
 
 
 class TestAlbum:

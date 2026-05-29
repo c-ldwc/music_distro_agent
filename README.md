@@ -1,28 +1,30 @@
-# Spotify Playlist Automation from Boomkat Emails
+# Spotify Playlist Automation
 
-Automatically create and sync Spotify playlists from Boomkat music distributor emails using AI-powered extraction and search.
+Automatically create and sync Spotify playlists from music distributor emails and web scrapes using AI-powered extraction.
 
 ## Overview
 
-This project automates the process of:
-1. Downloading emails from Gmail (Boomkat music distributor newsletters)
-2. Using AI agents to extract album/artist information from email content
-3. Searching Spotify for matching releases
-4. Creating dated playlists and adding found tracks
-5. Syncing playlists from a local database to Spotify
+1. Download emails from Gmail (music distributor newsletters), or scrape a URL directly
+2. AI agents extract album/artist information from the content
+3. Search Spotify for matching releases
+4. Create dated playlists and add found tracks
+5. Sync playlists from a local database to Spotify
 
 ## Architecture
 
 ```
 Gmail API → Email Download → AI Extraction Agent → AI Search Agent → Spotify API
-                                        ↓
-                                   SQLite DB ← Playlist Sync
+                                       ↓
+Scraped URL ──────────────────────────→↑
+                                       ↓
+                                  SQLite DB ← Playlist Sync
 ```
 
 **Components:**
-- **Email Processing**: Downloads and parses Boomkat emails using Gmail API
-- **AI Extraction Agent**: Uses Claude (Anthropic) to extract artist/album pairs from email text
-- **AI Search Agent**: Intelligently searches Spotify with retry logic to find matching releases
+- **Email Processing**: Downloads and parses emails using Gmail API
+- **Web Scraping**: Fetches any URL and saves it as a source for processing
+- **AI Extraction Agent**: Uses Claude (Anthropic) to extract artist/album pairs
+- **AI Search Agent**: Searches Spotify with retry logic to find matching releases
 - **Database**: SQLite storage for tracking playlists, tracks, and processing history
 - **Spotify Integration**: Creates/updates playlists and adds tracks
 
@@ -75,7 +77,6 @@ pip install -e .
 
 ### 6. Configure Environment Variables
 
-Copy the example environment file:
 ```bash
 cp .env.example .env
 ```
@@ -95,15 +96,15 @@ GMAIL_SECRET_PATH=client_secret_YOUR_PROJECT.apps.googleusercontent.com.json
 GMAIL_SCOPES=https://www.googleapis.com/auth/gmail.readonly
 
 # Email Processing
-EMAIL_PATH=boomkat_emails
+EMAIL_PATH=emails
 ```
 
 ### 7. First Run Authentication
 
-On first run, you'll need to authenticate with both Spotify and Gmail:
+On first run, authenticate with Spotify and Gmail:
 
 ```bash
-# This will open browser windows for OAuth authentication
+# Opens browser windows for OAuth authentication
 python download_emails.py
 ```
 
@@ -111,13 +112,25 @@ After authentication, `token.json` will be created automatically.
 
 ## Usage
 
+### Scrape a URL
+
+```bash
+python -m src.cli scrape <url> [--output file.txt] [--body] [--date YYYY-MM-DD] [--playlist-name "My Playlist"]
+```
+
+Fetches a URL and saves it as a source file for processing. Options:
+- `--body` / `-b`: Extract only the `<body>` text (strips HTML tags)
+- `--script` / `-s`: Keep `<script>` tags (only applies with `--body`)
+- `--date` / `-d`: Set the source date (defaults to now)
+- `--playlist-name` / `-p`: Playlist name to associate with this source
+
 ### Download New Emails
 
 ```bash
 python download_emails.py
 ```
 
-Downloads unread Boomkat emails from Gmail and saves them to `boomkat_emails/` directory.
+Downloads unread emails from Gmail and saves them to the configured directory.
 
 ### Process Emails and Create Playlists
 
@@ -125,11 +138,10 @@ Downloads unread Boomkat emails from Gmail and saves them to `boomkat_emails/` d
 python main.py
 ```
 
-This script:
-- Reads all email files from the configured directory
+- Reads all source files from the configured directory
 - Extracts artist/album information using AI
 - Searches Spotify for matches
-- Creates dated playlists (e.g., "Boomkat 2026-02-05")
+- Creates dated playlists
 - Adds found tracks to playlists
 - Records all actions in the database
 
@@ -158,19 +170,20 @@ spotify/
 │   ├── classes/         # Data models (Pydantic)
 │   ├── db/              # Database operations
 │   ├── spotify/         # Spotify API client
-│   ├── config.py        # Configuration validation (NEW)
+│   ├── cli.py           # CLI commands (including scrape)
+│   ├── config.py        # Configuration validation
 │   ├── logging_config.py # Logging setup
 │   ├── auth_gmail.py    # Gmail authentication
 │   ├── email_utils.py   # Email processing utilities
 │   └── helpers.py       # Helper functions
-├── tests/               # Test suite (NEW)
+├── tests/               # Test suite
 │   ├── conftest.py      # Test fixtures
 │   ├── test_config.py   # Configuration tests
 │   ├── test_database.py # Database tests
 │   └── test_models.py   # Model tests
-├── alembic/             # Database migrations (NEW)
+├── alembic/             # Database migrations
 │   └── versions/        # Migration files
-├── boomkat_emails/      # Downloaded email storage
+├── emails/              # Downloaded email storage
 ├── logs/                # Application logs
 ├── main.py              # Main processing script
 ├── download_emails.py   # Email download script
@@ -178,8 +191,7 @@ spotify/
 ├── create_playlists.py  # Individual playlist creator
 ├── playlists.db         # SQLite database
 ├── .env                 # Configuration (not in git)
-├── pyproject.toml       # Dependencies
-└── DEVELOPMENT.md       # Developer guide (NEW)
+└── pyproject.toml       # Dependencies
 ```
 
 ## Database Schema
@@ -229,7 +241,6 @@ All configuration is managed through environment variables in `.env`:
 **Solution**:
 - The application doesn't currently implement rate limiting
 - Wait a few minutes before retrying
-- Consider adding delays between requests (future enhancement)
 
 ### Database Locked
 
@@ -246,7 +257,6 @@ All configuration is managed through environment variables in `.env`:
 - Default quota is 1 billion quota units/day
 - Each email list call uses ~5 units
 - If exceeded, wait until quota resets (daily)
-- Check quota usage in Google Cloud Console
 
 ## Security Notes
 
@@ -265,12 +275,10 @@ All configuration is managed through environment variables in `.env`:
 3. **Access Scopes**:
    - Spotify: Only playlist modification (not full account access)
    - Gmail: Read-only access
-   - Minimal permissions principle
 
 4. **Token Storage**:
    - Tokens are stored locally in plain text
    - Protect your local machine
-   - Consider encrypting tokens for production use
 
 ## Development
 
@@ -298,25 +306,13 @@ alembic upgrade head
 ### Running Tests
 
 ```bash
-# All tests
-pytest
-
-# Specific test file
-pytest tests/test_config.py
-
-# With verbose output
-pytest -v
+pytest                        # All tests
+pytest tests/test_config.py   # Specific file
+pytest -v                     # Verbose
 ```
 
 ### Code Quality
 
-All code is automatically checked with:
-- **Ruff** - Linting and formatting
-- **MyPy** - Type checking
-- **Bandit** - Security scanning
-- **Pytest** - Automated testing
-
-Run manually:
 ```bash
 ruff check .          # Linting
 ruff format .         # Formatting
@@ -326,62 +322,22 @@ bandit -r src/        # Security scan
 
 ## Known Limitations
 
-- ~~No retry logic for failed API calls~~ ✅ Implemented in helpers
 - No rate limiting implementation
-- Processes all emails sequentially (no parallelization)
+- Processes all sources sequentially
 - SQLite may have concurrency issues with multiple processes
-- No email deduplication (may reprocess same emails)
+- No deduplication (may reprocess same sources)
 - Search agent limited to 5 attempts per album
 - No handling of album editions (deluxe, remaster, etc.)
 
-## Recent Improvements ✨
-
-### Phase 1 (Completed)
-- ✅ Enhanced security with improved .gitignore
-- ✅ Comprehensive README documentation
-- ✅ Fixed critical bugs
-- ✅ Professional logging system
-- ✅ Robust error handling
-
-### Phase 2 (Completed)
-- ✅ Configuration validation with helpful errors
-- ✅ Comprehensive test suite (30+ tests)
-- ✅ Pre-commit hooks with quality checks
-- ✅ Database migrations with Alembic
-- ✅ Developer documentation
-
 ## Contributing
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed contribution guidelines.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for contribution guidelines.
 
 Before submitting:
 1. Install pre-commit: `pre-commit install`
 2. Run tests: `pytest`
 3. Ensure quality checks pass: `pre-commit run --all-files`
 
-Pre-commit hooks will automatically:
-- Format code with Ruff
-- Run linting checks
-- Perform type checking
-- Scan for security issues
-- Run the test suite
-
-## Future Enhancements
-
-See [IMPROVEMENT_SPEC.md](IMPROVEMENT_SPEC.md) for detailed improvement roadmap including:
-- ~~Comprehensive error handling and retry logic~~ ✅ Partial (Phase 1)
-- ~~Proper logging framework~~ ✅ Complete (Phase 1)
-- ~~Test coverage~~ ✅ Complete (Phase 2)
-- ~~Database migrations~~ ✅ Complete (Phase 2)
-- Performance optimizations
-- Enhanced AI agent capabilities
-- Web interface
-- Docker deployment
-
 ## License
 
 [Add your license here]
-
-## Support
-
-[Add contact information or issue tracker link]

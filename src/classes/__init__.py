@@ -1,15 +1,15 @@
 from .classes import (
     Agent,
     album,
-    boom_email,
     extract_release,
+    music_source,
     playlist,
     track,
 )
 
 __all__ = [
     "Agent",
-    "boom_email",
+    "music_source",
     "playlist",
     "track",
     "album",
