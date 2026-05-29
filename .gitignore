@@ -31,3 +31,6 @@ playlists.db
 *.log
 logs/
 uv.lock
+
+# Jupyter checkpoints
+**/.ipynb_checkpoints/
