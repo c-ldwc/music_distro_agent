@@ -150,3 +150,15 @@ class TestRecordTrack:
         count = cursor.fetchone()[0]
 
         assert count == 2
+
+
+class TestImportSpotifyPlaylist:
+    def test_imports_skips_duplicates_and_invalid(self, temp_dir):
+        from src.db import import_spotify_playlist
+
+        conn = get_db_connection(str(temp_dir / "t.db"))
+        good = track(artist="A", album="B", track_id="4uLU6hMCjMI75M1A2tKUQC")
+        bad = track(artist="A", album="B", track_id="nope")
+        assert import_spotify_playlist(conn, "pl1", "P", [good, bad]) == {"imported": 1, "skipped": 1}
+        assert import_spotify_playlist(conn, "pl1", "P", [good]) == {"imported": 0, "skipped": 1}
+        conn.close()

@@ -13,7 +13,6 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from numpy import argsort
 
 import click
 import httpx
@@ -21,7 +20,6 @@ from bs4 import BeautifulSoup
 from httpx import HTTPStatusError
 from langchain.tools import tool
 
-from src import spotify
 from src.agent import ExtractionAgent, SearchAgent
 from src.config import load_config
 from src.db import get_db_connection
@@ -166,16 +164,15 @@ def get_popular(top_n: int, name_filter: str | None = None):
     spotify_service = SpotifyService(config.spotify)
     spotify_service.authenticate()
 
-    logger.info(name_filter)
     logger.info("Getting playlist tracks")
     cursor = db_conn.cursor()
-    playlist_qry = """select distinct playlist_id, playlist_name 
+    playlist_qry = """select distinct playlist_id, playlist_name
     from playlists
     where playlist_name not like '%Top'
     """
     if name_filter:
-        playlist_qry += f"and playlist_name {name_filter}"
-    playlists = cursor.execute(playlist_qry).fetchall()
+        playlist_qry += "and playlist_name like ?"
+    playlists = cursor.execute(playlist_qry, (f"%{name_filter}%",) if name_filter else ()).fetchall()
     logger.info(f"Found {len(playlists)} playlists to process")
 
     for playlist_id, playlist_name in playlists:
@@ -227,13 +224,10 @@ def get_popular(top_n: int, name_filter: str | None = None):
                 tracks = spotify_service.client.get_tracks(ids=ids_str)
 
                 # Sort by popularity (descending) and get top N
-                popularity = [t["popularity"] for t in tracks]
-                # argsort gives ascending order, so reverse to get highest first
-                idx = argsort(popularity)[::-1][:top_n]
+                idx = sorted(tracks, key=lambda t: t["popularity"], reverse=True)[:top_n]
 
                 # Record each top track in database
-                for i in idx:
-                    track_info = tracks[i]
+                for track_info in idx:
                     track_obj = track(artist=artist, album=album, track_id=track_info["id"])
                     record_track(db_conn, track_obj, new_name, new_playlist_id)
                     all_top_tracks.append(track_info["id"])
@@ -246,7 +240,7 @@ def get_popular(top_n: int, name_filter: str | None = None):
                 continue
 
         logger.info(f"✅ Completed playlist '{new_name}': {len(all_top_tracks)} total tracks recorded")
-        logger.info(f"   Use 'spotify-automation sync' to add tracks to Spotify")
+        logger.info("   Use 'spotify-automation sync' to add tracks to Spotify")
 
     # Cleanup
     db_conn.close()

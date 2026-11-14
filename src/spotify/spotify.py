@@ -11,7 +11,6 @@ from pydantic import AfterValidator, BaseModel
 from werkzeug.serving import make_server  # For graceful server shutdown
 
 from src import classes
-import json
 
 # --- Configuration ---
 
@@ -230,91 +229,43 @@ class spotify(BaseModel):
         return "error" not in self._construct_call(f"playlists/{id}")
 
     def get_playlist_by_name(self, name: str):
-        call = self._construct_call("me/playlists", params={"limit": 50})
-        names = [i["name"] for i in call["items"]]
-        if name in names:
-            playlist = call["items"][names.index(name)]
-            return {i: playlist[i] for i in playlist if i in ["id", "href"]}
-        while call["next"] is not None:
-            call = self._paginate(call["next"])
-            names.extend([i["name"] for i in call["items"]])
-            if name in names:
-                playlist = call["items"][names.index(name)]
-                return {i: playlist[i] for i in playlist if i in ["id", "href"]}
-
+        for p in self.get_user_playlists():
+            if p["name"] == name:
+                return {"id": p["id"], "href": p["href"]}
         return None
 
     def get_user_playlists(self) -> list[dict[str, Any]]:
-        """Get all playlists for the authenticated user.
-
-        Returns:
-            List of playlist dicts with keys: id, name, href, track_count
-        """
+        """Get all playlists for the authenticated user (id, name, href, track_count)."""
         call = self._construct_call("me/playlists", params={"limit": 50})
         playlists = []
-
-        for item in call["items"]:
-            playlists.append({
-                "id": item["id"],
-                "name": item["name"],
-                "href": item["href"],
-                "track_count": item["tracks"]["total"],
-            })
-
-        while call["next"] is not None:
+        while True:
+            playlists.extend(
+                {"id": i["id"], "name": i["name"], "href": i["href"], "track_count": i["tracks"]["total"]}
+                for i in call["items"]
+            )
+            if call["next"] is None:
+                return playlists
             call = self._paginate(call["next"])
-            for item in call["items"]:
-                playlists.append({
-                    "id": item["id"],
-                    "name": item["name"],
-                    "href": item["href"],
-                    "track_count": item["tracks"]["total"],
-                })
-
-        return playlists
 
     def get_playlist_tracks(self, playlist_id: str) -> list[dict[str, Any]]:
-        """Get all tracks from a playlist.
-
-        Args:
-            playlist_id: Spotify playlist ID
-
-        Returns:
-            List of track dicts with keys: track_id, artist, album
-        """
+        """Get all tracks from a playlist (track_id, artist, album); skips removed tracks."""
         call = self._construct_call(f"playlists/{playlist_id}/tracks", params={"limit": 50})
         tracks = []
-
-        for item in call["items"]:
-            if item["track"] is None:
-                continue
-            track = item["track"]
-            # Get first artist and album
-            artist = track["artists"][0]["name"] if track["artists"] else "Unknown"
-            album = track["album"]["name"] if track["album"] else "Unknown"
-
-            tracks.append({
-                "track_id": track["id"],
-                "artist": artist,
-                "album": album,
-            })
-
-        while call["next"] is not None:
-            call = self._paginate(call["next"])
+        while True:
             for item in call["items"]:
-                if item["track"] is None:
+                t = item["track"]
+                if t is None:
                     continue
-                track = item["track"]
-                artist = track["artists"][0]["name"] if track["artists"] else "Unknown"
-                album = track["album"]["name"] if track["album"] else "Unknown"
-
-                tracks.append({
-                    "track_id": track["id"],
-                    "artist": artist,
-                    "album": album,
-                })
-
-        return tracks
+                tracks.append(
+                    {
+                        "track_id": t["id"],
+                        "artist": t["artists"][0]["name"] if t["artists"] else "Unknown",
+                        "album": t["album"]["name"] if t["album"] else "Unknown",
+                    }
+                )
+            if call["next"] is None:
+                return tracks
+            call = self._paginate(call["next"])
 
     def create_playlist(self, name: str, public: bool = True, collaborative: bool = False):
         body = {"name": name, "public": public, "collaborative": collaborative, "description": ""}
